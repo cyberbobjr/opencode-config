@@ -1,37 +1,22 @@
 ---
-description: Create and implement a new feature as a User Story (Backlog Phase 7)
+description: Create a new feature User Story in the Backlog (Phase 7) — no implementation
 argument:
   required: true
   description: "Feature description (e.g. 'Export briefings to CSV')"
 ---
 
-# `/feature "description"` — New Feature
+# `/feature "description"` — New Feature Story
 
-Creates a User Story in the Backlog (Phase 7) and runs the full cycle: refinement → TDD → QA → quality gates → commit.
+Creates a User Story in the Backlog (Phase 7) and stops. Use `/refine US X.Y` when ready to refine it, then `/next-story` to implement it.
 
-## Workflow
+## Steps
 
-### 1. Create the User Story
-
-1. Call the MCP tool `kanban-create-story(title, priority="P2", phase=7)` to create the story in `user-stories/*.json`
+1. Call `kanban-create-story(title="$ARGUMENTS", priority="P2", phase=7)`
 2. Display the generated ID to the user (e.g. `US 7.1`)
-
-### 2. Refinement
-
-1. Delegate to `/refine US 7.N` (Refinement Agent)
-2. The user defines acceptance criteria during the challenge session
-3. Validated ACs are persisted via `kanban-update-story("US 7.N", ...)` by the refinement agent
-4. **[STOP]** Ask: "Proceed to TDD implementation?" — if yes → Step 3
-
-### 3. TDD Implementation → QA → Quality Gates → Commit
-
-1. Delegate to `/tdd US 7.N`
-2. Delegate to `/qa US 7.N`
-3. Quality gates + `/simplify`
-4. `/commit` + `kanban-move-story("US 7.N", "completed")`
+3. **Done** — the story is in the backlog with status `pending`
 
 ## Reminders
 
-- ✅ One new feature = one User Story in `user-stories/*.json`
-- ✅ The cycle is identical to planned stories
-- ✅ Priority defaults to `P2` (adjustable during refinement)
+- ✅ Priority defaults to `P2` (adjustable via the modal or during refinement)
+- ✅ Use `/refine US X.Y` to run the refinement cycle when you're ready
+- ✅ Use `/next-story` or the Kanban board to pick it up for implementation
