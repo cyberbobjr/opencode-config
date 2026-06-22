@@ -308,6 +308,59 @@
     return `<div class="m-section"><h3>Historique</h3><div class="h-list">${rows}</div></div>`;
   }
 
+  function implementationGuideSection(s) {
+    const ig = s.implementation_guide;
+    if (!ig || typeof ig !== "object" || !Object.keys(ig).length) return "";
+
+    const scopeBadges = (ig.scope || [])
+      .map((sc) => `<span class="ig-scope-badge">${escHtml(sc)}</span>`)
+      .join("");
+
+    const typeHtml = ig.type
+      ? `<div class="ig-meta-row"><span class="ig-label">Type</span><span class="ig-type-badge">${escHtml(ig.type)}</span>${scopeBadges}</div>`
+      : "";
+
+    const approachHtml = ig.approach
+      ? `<div class="ig-approach">${escHtml(ig.approach)}</div>`
+      : "";
+
+    function fileList(files, colorClass) {
+      if (!files || !files.length) return "";
+      return files.map((f) => {
+        const detail = f.role || f.change || f.reason || "";
+        return `<div class="ig-file ${colorClass}"><code>${escHtml(f.path)}</code>${detail ? `<span class="ig-file-detail">${escHtml(detail)}</span>` : ""}</div>`;
+      }).join("");
+    }
+
+    const filesCreate = fileList(ig.files_create, "ig-create");
+    const filesModify = fileList(ig.files_modify, "ig-modify");
+    const filesDelete = fileList(ig.files_delete, "ig-delete");
+    const filesHtml = (filesCreate || filesModify || filesDelete)
+      ? `<div class="ig-files-section">
+          <div class="ig-sub-label">Fichiers</div>
+          <div class="ig-files">${filesCreate}${filesModify}${filesDelete}</div>
+        </div>`
+      : "";
+
+    const stepsHtml = ig.steps && ig.steps.length
+      ? `<div class="ig-steps-section">
+          <div class="ig-sub-label">Séquence d'implémentation</div>
+          <ol class="ig-steps">${ig.steps.map((st) => `<li>${escHtml(st)}</li>`).join("")}</ol>
+        </div>`
+      : "";
+
+    const bottomMeta = [
+      ig.test_strategy ? `<div class="ig-bottom-row"><span class="ig-label">Tests</span><span>${escHtml(ig.test_strategy)}</span></div>` : "",
+      ig.constraints ? `<div class="ig-bottom-row"><span class="ig-label">Contraintes</span><span>${escHtml(ig.constraints)}</span></div>` : "",
+      ig.data_model ? `<div class="ig-bottom-row"><span class="ig-label">Modèle</span><span>${escHtml(ig.data_model)}</span></div>` : "",
+    ].filter(Boolean).join("");
+
+    const body = [typeHtml, approachHtml, filesHtml, stepsHtml, bottomMeta].filter(Boolean).join("");
+    if (!body) return "";
+
+    return `<div class="m-section"><h3>Plan d'implémentation</h3><div class="ig-body">${body}</div></div>`;
+  }
+
   function refinementSection(s) {
     const decisions = s.refine_decisions || [];
     if (!decisions.length) return "";
@@ -373,6 +426,7 @@
       <div id="me-acs">${acs}</div>
     </div>
     ${refinementSection(s)}
+    ${implementationGuideSection(s)}
     <div class="m-row"><label>Notes</label><textarea id="me-notes" rows="2">${escHtml(s.notes || "")}</textarea></div>
     <div class="m-section">
       <h3>TDD</h3>
