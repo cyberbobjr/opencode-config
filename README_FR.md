@@ -33,9 +33,9 @@ Au cœur du système : un serveur Kanban qui fonctionne simultanément comme **t
 │   ├── simplify.md        — Revue qualité du code (3 sous-agents)
 │   ├── review-pr.md       — Revue de PR GitHub et réponses
 │   ├── commit.md          — Assistant commit conventionnel
-│   ├── feature.md         — Créer + implémenter une story de fonctionnalité
-│   ├── fix.md             — Créer + corriger une story de bug
-│   └── change.md          — Créer une story de modification avec analyse d'impact
+│   ├── feature.md         — Créer une story de fonctionnalité (backlog uniquement)
+│   ├── fix.md             — Créer une story de bug (backlog uniquement)
+│   └── change.md          — Créer une story de modification (backlog uniquement)
 │
 ├── agents/                — Sous-agents réutilisables (appelés par les commandes)
 │   ├── code-simplify-quality.md
@@ -191,9 +191,9 @@ Toutes les commandes sont agnostiques à la stack. Elles référencent `AGENTS.m
 | `/simplify` | Revue de code par 3 sous-agents |
 | `/review-pr [numéro]` | Récupérer les commentaires GitHub PR, classer, corriger, répondre |
 | `/commit` | Proposer et créer un commit conventionnel |
-| `/feature "..."` | Créer une story de fonctionnalité et l'implémenter |
-| `/fix "..."` | Créer une story de bug et le corriger |
-| `/change "..."` | Créer une story de modification avec analyse d'impact |
+| `/feature "..."` | Créer une story de fonctionnalité dans le backlog (sans implémentation) |
+| `/fix "..."` | Créer une story de bug dans le backlog (sans implémentation) |
+| `/change "..."` | Créer une story de modification dans le backlog (sans implémentation) |
 
 ---
 

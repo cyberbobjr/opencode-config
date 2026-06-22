@@ -33,9 +33,9 @@ At its core: a Kanban server that works simultaneously as a **web dashboard**, a
 │   ├── simplify.md        — Code quality review (3 sub-agents)
 │   ├── review-pr.md       — GitHub PR review and response
 │   ├── commit.md          — Conventional commit helper
-│   ├── feature.md         — Create + implement a new feature story
-│   ├── fix.md             — Create + fix a bug story
-│   └── change.md          — Create a change story with impact analysis
+│   ├── feature.md         — Create a new feature story (backlog only)
+│   ├── fix.md             — Create a bug story (backlog only)
+│   └── change.md          — Create a change story (backlog only)
 │
 ├── agents/                — Reusable sub-agents (called by commands)
 │   ├── code-simplify-quality.md
@@ -191,9 +191,9 @@ All commands are stack-agnostic. They reference `AGENTS.md` in your project root
 | `/simplify` | Code quality review by 3 sub-agents |
 | `/review-pr [number]` | Fetch GitHub PR comments, classify, fix, reply |
 | `/commit` | Propose and create a conventional commit |
-| `/feature "..."` | Create a new feature story and implement it |
-| `/fix "..."` | Create a bug story and fix it |
-| `/change "..."` | Create a change story with impact analysis |
+| `/feature "..."` | Create a new feature story in the backlog (no implementation) |
+| `/fix "..."` | Create a bug story in the backlog (no implementation) |
+| `/change "..."` | Create a change story in the backlog (no implementation) |
 
 ---
 
