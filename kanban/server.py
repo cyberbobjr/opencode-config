@@ -451,6 +451,8 @@ async def api_events():
 @rest.get("/")
 def dashboard():
     html = (HERE / "templates" / "dashboard.html").read_text(encoding="utf-8")
+    js_mtime = int((HERE / "static" / "app.js").stat().st_mtime)
+    html = html.replace('src="/static/app.js"', f'src="/static/app.js?v={js_mtime}"')
     return HTMLResponse(html)
 
 

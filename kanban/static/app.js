@@ -308,6 +308,21 @@
     return `<div class="m-section"><h3>Historique</h3><div class="h-list">${rows}</div></div>`;
   }
 
+  function refinementSection(s) {
+    const decisions = s.refine_decisions || [];
+    if (!decisions.length) return "";
+    const items = decisions.map((d) => {
+      if (typeof d === "string") {
+        return `<div class="rd-item"><span class="rd-decision">${escHtml(d)}</span></div>`;
+      }
+      const role = d.role ? `<span class="rd-role">${escHtml(d.role)}</span>` : "";
+      const q = d.question ? `<span class="rd-q">${escHtml(d.question)}</span>` : "";
+      const dec = escHtml(d.decision || d.text || "");
+      return `<div class="rd-item">${role}${q}<span class="rd-decision">→ ${dec}</span></div>`;
+    }).join("");
+    return `<div class="m-section"><h3>Décisions de raffinement</h3><div class="rd-list">${items}</div></div>`;
+  }
+
   function modalContent(s) {
     const acs = (s.acceptance_criteria || [])
       .map(
@@ -357,6 +372,7 @@
       <h3>Critères d'acceptation</h3>
       <div id="me-acs">${acs}</div>
     </div>
+    ${refinementSection(s)}
     <div class="m-row"><label>Notes</label><textarea id="me-notes" rows="2">${escHtml(s.notes || "")}</textarea></div>
     <div class="m-section">
       <h3>TDD</h3>
