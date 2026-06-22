@@ -6,6 +6,3 @@ bun.lock
 kanban/kanban.log
 kanban/__pycache__/
 kanban/*.pyc
-
-# Project-specific content — not part of the generic template
-archive/
