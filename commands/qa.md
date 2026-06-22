@@ -157,6 +157,15 @@ cause        = "middleware checks expiration before refresh"
 4. Return the structured report to the orchestrator agent (see format above)
 5. **If the report contains failed ACs**, ensure the complete diagnosis (file, line, assertion) is usable by TDD in `fix-failing-acs` mode
 
+## Pipeline — Next Steps
+
+After QA passes, the orchestrator **must** continue with:
+
+1. **Simplify** (`/simplify US X.Y`) — reuse/quality/efficiency review of the diff
+2. **Commit** — only after Simplify passes
+
+> ⚠️ Do NOT skip Simplify after QA. It is a mandatory step before commit.
+
 ## Reminders
 
 - ❌ Never modify `user-stories/*.json` files directly — use the MCP tools (`kanban-update-story`)

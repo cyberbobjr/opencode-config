@@ -154,6 +154,16 @@ Fix all issues before moving to the next step.
    - If `failed` → stop and display the failure report (user decides what to do next)
 3. Return the structured report to the orchestrator agent
 
+## Pipeline — Next Steps
+
+After TDD (and the SecOps code review), the orchestrator **must** continue with:
+
+1. **QA** (`/qa US X.Y`) — validates each AC with integration/E2E tests, marks ACs as `checked: true/false`
+2. **Simplify** (`/simplify US X.Y`) — reuse/quality/efficiency review of the diff
+3. **Commit** only after both QA and Simplify pass
+
+> ⚠️ Do NOT skip directly to commit after TDD. QA and Simplify are mandatory steps.
+
 ## Reminders
 
 - ❌ Never modify `user-stories/*.json` files directly — use the MCP tools (`kanban-update-story`)

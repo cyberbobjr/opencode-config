@@ -3,7 +3,7 @@
   "mcp": {
     "kanban": {
       "type": "local",
-      "command": ["python", ".opencode/kanban/server.py", "--mcp", "--debug"],
+      "command": ["python", ".opencode/kanban/server.py", "--mcp","--debug"],
       "enabled": true
     }
   }

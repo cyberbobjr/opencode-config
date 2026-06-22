@@ -373,6 +373,31 @@
     return `<div class="m-section"><h3>Plan d'implémentation</h3><div class="ig-body">${body}</div></div>`;
   }
 
+  function simplifyReportSection(s) {
+    const r = s.simplify_report;
+    if (!r || !r.status) return "";
+    const statusColor = { passed: "#22c55e", fixed: "#fb923c", skipped: "#64748b" }[r.status] || "#64748b";
+    const statusLabel = { passed: "Aucun problème", fixed: "Problèmes corrigés", skipped: "Ignoré" }[r.status] || r.status;
+    const agentRows = r.agents
+      ? Object.entries(r.agents).map(([agent, summary]) =>
+          `<div class="sr-agent"><span class="sr-agent-name">${escHtml(agent)}</span><span class="sr-agent-summary">${escHtml(summary)}</span></div>`
+        ).join("")
+      : "";
+    const counters = (r.issues_found != null)
+      ? `<div class="sr-counters">
+          <span class="sr-counter"><span class="sr-num">${r.issues_found}</span> trouvés</span>
+          <span class="sr-counter sr-fixed"><span class="sr-num">${r.issues_fixed ?? 0}</span> corrigés</span>
+        </div>`
+      : "";
+    const notes = r.notes ? `<div class="sr-notes">${escHtml(r.notes)}</div>` : "";
+    return `<div class="m-section sr-section">
+      <h3>Simplify <span class="sr-status" style="background:${statusColor}20;color:${statusColor};border-color:${statusColor}40">${statusLabel}</span></h3>
+      ${counters}
+      ${agentRows}
+      ${notes}
+    </div>`;
+  }
+
   function refinementSection(s) {
     const decisions = s.refine_decisions || [];
     if (!decisions.length) return "";
@@ -495,8 +520,9 @@
         <h3>SecOps CR — Commentaires</h3>
         <div class="m-row"><textarea id="me-secops-comments" rows="2" placeholder="Observations, risques, recommandations...">${escHtml((s.secops_report && s.secops_report.comments) || "")}</textarea></div>
       </div>
+      ${simplifyReportSection(s)}
       <div class="m-section">
-        <h3>Simplify — Commentaires</h3>
+        <h3>Simplify — Notes manuelles</h3>
         <div class="m-row"><textarea id="me-simplify-comments" rows="2" placeholder="Simplifications appliquées, refactoring noté...">${escHtml(s.simplify_comments || "")}</textarea></div>
       </div>
     </div>

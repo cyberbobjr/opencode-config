@@ -1,8 +1,13 @@
 ---
-description: Review changed files for reuse, quality, and efficiency. Fix issues found.
+description: Review changed files for reuse, quality, and efficiency. Fix issues found. Optionally writes a simplify_report to the Kanban story.
+argument:
+  optional: true
+  description: "Story ID to update after review, e.g. 'US 1.3'. If omitted, report is shown in chat only."
 ---
 
 Review all changed files for reuse, quality, and efficiency. Fix any issues found.
+
+The argument (if provided) is the story ID to update: `/simplify US 1.3`
 
 ## Phase 1: Identify Changes
 
@@ -22,4 +27,39 @@ Pass each agent the full diff so it has the complete context.
 
 Wait for all three agents to complete. Aggregate their findings and fix each issue directly. If a finding is a false positive or not worth addressing, note it and move on — do not argue with the finding, just skip it.
 
-When done, briefly summarize what was fixed (or confirm the code was already clean).
+When done, compile the results:
+- `issues_found`: total number of issues across all three agents
+- `issues_fixed`: number of issues actually fixed (false positives excluded)
+- Per-agent summary (one sentence each): what was found / confirmed clean
+
+## Phase 4: Persist Report to Story (if story ID provided)
+
+If a story ID was given as argument, call `kanban-update-story` with:
+
+```json
+{
+  "_actor": "simplify",
+  "simplify_report": {
+    "status": "fixed",
+    "issues_found": <total>,
+    "issues_fixed": <fixed>,
+    "agents": {
+      "reuse": "<one-line summary>",
+      "quality": "<one-line summary>",
+      "efficiency": "<one-line summary>"
+    },
+    "notes": "<overall 1-2 sentence summary of what changed or that the code was already clean>"
+  }
+}
+```
+
+Use `"status": "passed"` when no issues were found, `"status": "fixed"` when issues were found and fixed, `"status": "skipped"` if there were no relevant files to review.
+
+## Pipeline — Next Steps
+
+After Simplify passes, the orchestrator **must** continue with:
+
+1. **Move story to `commit_ready`** — `kanban-move-story("$ARGUMENTS", "commit_ready", "simplify")`
+2. **Commit** — propose a conventional commit message, stage, and commit
+
+> ⚠️ Do NOT commit before Simplify completes. Simplify is the last quality gate before commit.

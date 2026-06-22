@@ -156,7 +156,7 @@ Execute each step **actively and sequentially**.
 **Step 4 — Quality Gates**
 
 1. Run the commands listed in `AGENTS.md` section "Before each push / PR"
-2. Run `/simplify` for the 3 sub-agents (quality, reuse, efficiency)
+2. Run `/simplify US X.Y` — passes the story ID so the report is written to the story
 3. Fix any issues found
 4. Call `kanban-move-story("US X.Y", "commit_ready", "simplify")`
 5. **[STOP]** Ask: "Approve the commit?" — if yes → Step 5, otherwise STOP
@@ -193,7 +193,7 @@ Used when the dashboard moves a card to the `simplify` column.
 
 1. Retrieve context via `kanban-get-story("US X.Y")`
 2. Run the commands listed in `AGENTS.md` section "Before each push / PR"
-3. Run `/simplify` for the 3 sub-agents (quality, reuse, efficiency)
+3. Run `/simplify US X.Y` — passes the story ID so the report is written to the story
 4. Fix any issues found
 5. Call `kanban-move-story("US X.Y", "commit_ready", "simplify")`
 6. Display summary — the story is ready for commit

@@ -357,6 +357,18 @@
     }
     .modal .ig-bottom-row .ig-label { padding-top: 0.05rem; min-width: 5rem; }
 
+    /* Simplify report */
+    .modal .sr-section h3 { display: flex; align-items: center; gap: 0.5rem; }
+    .modal .sr-status { font-size: 0.65rem; font-weight: 600; padding: 0.1rem 0.45rem; border-radius: 10px; border: 1px solid; letter-spacing: 0.02em; }
+    .modal .sr-counters { display: flex; gap: 0.75rem; margin-bottom: 0.55rem; }
+    .modal .sr-counter { font-size: 0.72rem; color: #64748b; }
+    .modal .sr-counter.sr-fixed { color: #fb923c; }
+    .modal .sr-num { font-weight: 700; color: inherit; margin-right: 0.2rem; }
+    .modal .sr-agent { display: flex; gap: 0.5rem; align-items: baseline; padding: 0.3rem 0.6rem; background: #0c1320; border-radius: 5px; margin-bottom: 0.3rem; }
+    .modal .sr-agent-name { font-size: 0.65rem; font-weight: 700; color: #818cf8; text-transform: uppercase; letter-spacing: 0.06em; min-width: 5.5rem; flex-shrink: 0; }
+    .modal .sr-agent-summary { font-size: 0.72rem; color: #94a3b8; line-height: 1.4; }
+    .modal .sr-notes { font-size: 0.73rem; color: #64748b; margin-top: 0.4rem; font-style: italic; }
+
     @media (max-width: 900px) {
       .kanban { flex-direction: column; }
       .kcol { min-width: 100%; }

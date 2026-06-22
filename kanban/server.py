@@ -431,15 +431,22 @@ def api_reorder(body: dict):
 @rest.get("/api/events")
 async def api_events():
     last = _story_version
+    ticks_since_ping = 0  # send a keepalive comment every 15s (30 × 0.5s)
 
     async def event_gen():
-        nonlocal last
+        nonlocal last, ticks_since_ping
+        yield f"data: refresh\n\n"  # immediate sync on connect/reconnect
         while True:
             await asyncio.sleep(0.5)
+            ticks_since_ping += 1
             v = _story_version
             if v != last:
                 last = v
+                ticks_since_ping = 0
                 yield f"data: refresh\n\n"
+            elif ticks_since_ping >= 30:
+                ticks_since_ping = 0
+                yield ": ping\n\n"  # SSE comment — keeps the connection alive
 
     return StreamingResponse(event_gen(), media_type="text/event-stream", headers={
         "Cache-Control": "no-cache",
