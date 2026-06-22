@@ -1,0 +1,11 @@
+node_modules
+package-lock.json
+bun.lock
+
+# Runtime artifacts — local only
+kanban/kanban.log
+kanban/__pycache__/
+kanban/*.pyc
+
+# Project-specific content — not part of the generic template
+archive/

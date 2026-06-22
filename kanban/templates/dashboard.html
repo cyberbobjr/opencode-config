@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Kanban — Stories</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3/dist/tabler-icons.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.6/Sortable.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #0f172a; color: #e2e8f0; padding: 0; line-height: 1.5;
+    }
+    .kanban-wrap { max-width: 100vw; padding: 1.5rem; margin: 0 auto; overflow-x: auto; }
+
+    /* Header */
+    .kb-header { display: flex; align-items: center; gap: 1rem; margin-bottom: 1rem; flex-wrap: wrap; }
+    .kb-header h1 { font-size: 1.5rem; font-weight: 700; color: #f1f5f9; }
+    .kb-header h1 small { font-size: 0.85rem; color: #64748b; font-weight: 400; }
+    .kb-header .spacer { flex: 1; }
+    .kb-header .toggle-group { display: flex; background: #1e293b; border-radius: 8px; overflow: hidden; border: 1px solid #334155; }
+    .kb-header .toggle-group button {
+      padding: 0.5rem 1rem; border: none; background: transparent; color: #94a3b8;
+      cursor: pointer; font-size: 0.8rem; font-weight: 500; transition: all 0.15s;
+    }
+    .kb-header .toggle-group button.active { background: #334155; color: #e2e8f0; }
+    .kb-header .toggle-group button:hover { color: #e2e8f0; }
+    .kb-header .new-btn {
+      padding: 0.5rem 1rem; border: none; border-radius: 8px;
+      background: #c41e3a; color: #fff; cursor: pointer; font-size: 0.8rem; font-weight: 600;
+      transition: background 0.15s; display: flex; align-items: center; gap: 0.35rem;
+    }
+    .kb-header .new-btn:hover { background: #a01830; }
+    .kb-header .search {
+      background: #1e293b; border: 1px solid #334155; border-radius: 8px;
+      padding: 0.45rem 0.8rem; color: #e2e8f0; font-size: 0.8rem; width: 180px;
+      outline: none; transition: border-color 0.15s;
+    }
+    .kb-header .search:focus { border-color: #c41e3a; }
+    .kb-header .search::placeholder { color: #475569; }
+
+    /* Stats bar */
+    .stats-bar {
+      display: flex; gap: 1.5rem; flex-wrap: wrap; padding: 0.75rem 1rem;
+      background: #1e293b; border-radius: 10px; border: 1px solid #334155;
+      margin-bottom: 1rem; font-size: 0.8rem;
+    }
+    .stats-bar .s-item { display: flex; align-items: center; gap: 0.4rem; }
+    .stats-bar .s-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+    .stats-bar .s-num { font-weight: 700; font-variant-numeric: tabular-nums; }
+    .stats-bar .s-sep { color: #334155; }
+
+    /* Kanban columns */
+    .kanban { display: flex; gap: 0.75rem; align-items: flex-start; min-height: 70vh; transition: 0.2s; }
+    .kcol {
+      flex: 1; min-width: 180px; background: #1e293b; border-radius: 10px;
+      border: 1px solid #334155; overflow: hidden;
+      transition: border-color 0.2s;
+    }
+    .kcol.drag-over { border-color: #c41e3a; }
+    .kcol-header {
+      padding: 0.75rem 0.75rem 0.5rem; font-size: 0.75rem; font-weight: 600;
+      text-transform: uppercase; letter-spacing: 0.05em; display: flex; align-items: center; gap: 0.4rem;
+    }
+    .kcol-header .count {
+      background: #334155; color: #94a3b8; border-radius: 999px;
+      padding: 0.05rem 0.45rem; font-size: 0.65rem; font-weight: 700;
+    }
+    .kcol-list {
+      min-height: 60px; padding: 0.25rem 0.5rem 0.5rem;
+      transition: min-height 0.2s;
+    }
+    .kcol-list.drag-over-list { min-height: 100px; }
+
+    .card {
+      background: #0f172a; border-radius: 8px; border: 1px solid #334155;
+      padding: 0.6rem 0.7rem; margin-bottom: 0.4rem;
+      cursor: grab; transition: box-shadow 0.15s, border-color 0.15s;
+    }
+    .card:hover { box-shadow: 0 2px 12px rgba(0,0,0,0.3); border-color: #475569; }
+    .card:active { cursor: grabbing; }
+    .card.sortable-chosen { opacity: 0.6; }
+    .card.sortable-ghost {
+      opacity: 0.2; background: #1e40af; border: 2px dashed #3b82f6;
+    }
+    .card .c-top { display: flex; align-items: center; gap: 0.35rem; margin-bottom: 0.25rem; }
+    .card .c-id { font-size: 0.65rem; color: #64748b; font-family: 'SF Mono', 'Cascadia Code', monospace; }
+    .card .c-prio {
+      font-size: 0.55rem; font-weight: 700; padding: 0.05rem 0.3rem; border-radius: 3px;
+      text-transform: uppercase;
+    }
+    .c-prio.P0 { background: #991b1b; color: #fca5a5; }
+    .c-prio.P1 { background: #854d0e; color: #fde68a; }
+    .c-prio.P2 { background: #1e3a5f; color: #93c5fd; }
+    .c-prio.Future { background: #374151; color: #9ca3af; }
+    .card .c-title { font-size: 0.78rem; color: #e2e8f0; line-height: 1.35; word-break: break-word; }
+    .card .c-badges { display: flex; gap: 0.3rem; margin-top: 0.3rem; flex-wrap: wrap; }
+    .card .c-badge {
+      font-size: 0.55rem; padding: 0.05rem 0.3rem; border-radius: 3px;
+      font-family: 'SF Mono', monospace;
+    }
+    .c-badge.passed { background: #064e3b; color: #10b981; }
+    .c-badge.failed { background: #450a0a; color: #ef4444; }
+    .c-badge.in_progress { background: #2e1065; color: #8b5cf6; }
+    .c-badge.pending { background: #1e293b; color: #6b7280; border: 1px solid #334155; }
+
+    /* Colors per column */
+    .kcol-pending .kcol-header { color: #6b7280; }
+    .kcol-refining .kcol-header { color: #f59e0b; }
+    .kcol-secops_tm .kcol-header { color: #7c3aed; }
+    .kcol-tdd .kcol-header { color: #3b82f6; }
+    .kcol-secops_cr .kcol-header { color: #a78bfa; }
+    .kcol-qa .kcol-header { color: #ec4899; }
+    .kcol-simplify .kcol-header { color: #14b8a6; }
+    .kcol-commit_ready .kcol-header { color: #10b981; }
+    .kcol-completed .kcol-header { color: #065f46; }
+    .kcol-blocked .kcol-header { color: #ef4444; }
+
+    /* List view */
+    .list-view { display: none; }
+    .list-view.visible { display: block; }
+    .kanban.visible { display: none; }
+    .kanban:not(.hidden) { display: flex; }
+    .list-view table {
+      width: 100%; border-collapse: collapse; font-size: 0.8rem;
+    }
+    .list-view th {
+      text-align: left; padding: 0.5rem 0.75rem; color: #64748b;
+      font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.05em;
+      border-bottom: 1px solid #334155; cursor: pointer; user-select: none;
+    }
+    .list-view th:hover { color: #94a3b8; }
+    .list-view td { padding: 0.45rem 0.75rem; border-bottom: 1px solid #1e293b; }
+    .list-view tr:hover td { background: #1e293b; }
+    .list-view tr { cursor: pointer; }
+    .list-view .lv-phase { color: #64748b; font-size: 0.7rem; }
+    .list-view .lv-prio { }
+    .list-view .lv-status {
+      display: inline-flex; align-items: center; gap: 0.3rem;
+      font-size: 0.7rem; padding: 0.1rem 0.4rem; border-radius: 4px;
+    }
+
+    /* Modal */
+    .modal-overlay {
+      display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6);
+      z-index: 1000; align-items: center; justify-content: center; padding: 1rem;
+    }
+    .modal-overlay.open { display: flex; }
+    .modal {
+      background: #1e293b; border-radius: 12px; border: 1px solid #334155;
+      width: 100%; max-width: 700px; max-height: 90vh; overflow-y: auto;
+      padding: 1.5rem; position: relative;
+    }
+    .toast-container {
+      position: fixed; bottom: 1.5rem; right: 1.5rem; z-index: 2000;
+      display: flex; flex-direction: column; gap: 0.5rem; pointer-events: none;
+    }
+    .toast {
+      background: #1e293b; border: 1px solid #334155; border-radius: 8px;
+      padding: 0.65rem 1rem; font-size: 0.8rem; color: #e2e8f0;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+      animation: toast-in 0.3s ease, toast-out 0.3s ease 4.7s forwards;
+      pointer-events: auto;
+    }
+    .toast.toast-success { border-left: 3px solid #10b981; }
+    .toast.toast-warning { border-left: 3px solid #f59e0b; }
+    .toast.toast-error { border-left: 3px solid #ef4444; }
+    @keyframes toast-in { from { opacity: 0; transform: translateY(1rem); } to { opacity: 1; transform: translateY(0); } }
+    @keyframes toast-out { from { opacity: 1; } to { opacity: 0; transform: translateY(-0.5rem); } }
+
+    .trigger-toggle {
+      display: flex; align-items: center; gap: 0.4rem; font-size: 0.75rem;
+      padding: 0.35rem 0.6rem; background: #1e293b; border: 1px solid #334155;
+      border-radius: 8px; cursor: pointer; color: #94a3b8; user-select: none;
+      transition: all 0.15s;
+    }
+    .trigger-toggle:hover { border-color: #475569; }
+    .trigger-toggle .indicator {
+      width: 8px; height: 8px; border-radius: 50%; display: inline-block;
+      background: #6b7280; transition: background 0.2s;
+    }
+    .trigger-toggle .indicator.on { background: #10b981; box-shadow: 0 0 6px #10b98144; }
+    .trigger-toggle .indicator.off { background: #6b7280; }
+    .trigger-toggle .ti { font-size: 0.9rem; }
+
+    .modal-close {
+      position: absolute; top: 0.75rem; right: 1rem; background: none; border: none;
+      color: #64748b; font-size: 1.2rem; cursor: pointer;
+    }
+    .modal-close:hover { color: #ef4444; }
+    .modal h2 { font-size: 1.1rem; font-weight: 600; color: #f1f5f9; margin-bottom: 1rem; }
+    .modal .m-row { margin-bottom: 0.75rem; }
+    .modal label {
+      display: block; font-size: 0.7rem; color: #64748b;
+      text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.2rem;
+    }
+    .modal input, .modal textarea, .modal select {
+      width: 100%; background: #0f172a; border: 1px solid #334155; border-radius: 6px;
+      padding: 0.5rem 0.65rem; color: #e2e8f0; font-size: 0.85rem; outline: none;
+      transition: border-color 0.15s; font-family: inherit;
+    }
+    .modal input:focus, .modal textarea:focus, .modal select:focus { border-color: #c41e3a; }
+    .modal textarea { min-height: 60px; resize: vertical; }
+    .modal .m-inline { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
+    .modal .m-inline-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0.75rem; }
+    .modal .m-label-row { margin-bottom: 0.2rem; }
+    .modal .m-label-row label { margin-bottom: 0; }
+    .modal .m-actions { display: flex; gap: 0.5rem; justify-content: flex-end; margin-top: 1rem; }
+    .modal .stack-tags { display: flex; flex-wrap: wrap; gap: 0.35rem; margin-top: 0.3rem; }
+    .modal .stack-tag {
+      display: inline-flex; align-items: center; gap: 0.2rem;
+      padding: 0.15rem 0.5rem; border-radius: 4px; font-size: 0.7rem; font-weight: 600;
+      cursor: pointer; border: 1px solid #334155; color: #64748b; background: #0f172a;
+      user-select: none; transition: all 0.15s;
+    }
+    .modal .stack-tag:hover { border-color: #475569; color: #94a3b8; }
+    .modal .stack-tag.active { border-color: var(--stk-color, #3b82f6); color: var(--stk-color, #3b82f6); background: color-mix(in srgb, var(--stk-color, #3b82f6) 15%, transparent); }
+    .modal .m-actions button {
+      padding: 0.5rem 1rem; border: none; border-radius: 6px; cursor: pointer;
+      font-size: 0.8rem; font-weight: 600; transition: background 0.15s;
+    }
+    .modal .btn-primary { background: #c41e3a; color: #fff; }
+    .modal .btn-primary:hover { background: #a01830; }
+    .modal .btn-secondary { background: #334155; color: #94a3b8; }
+    .modal .btn-secondary:hover { background: #475569; color: #e2e8f0; }
+    .modal .btn-danger { background: transparent; color: #ef4444; border: 1px solid #ef4444; }
+    .modal .btn-danger:hover { background: #450a0a; }
+    .modal .ac-item {
+      display: flex; align-items: flex-start; gap: 0.4rem;
+      padding: 0.3rem 0; border-bottom: 1px solid #0f172a;
+    }
+    .modal .ac-item:last-child { border-bottom: none; }
+    .modal .ac-item input[type="checkbox"] {
+      width: auto; margin-top: 0.25rem; accent-color: #10b981; flex-shrink: 0;
+    }
+    .modal .ac-item .ac-text {
+      flex: 1; font-size: 0.8rem; color: #94a3b8;
+      text-decoration: none; transition: color 0.15s;
+    }
+    .modal .ac-item input[type="checkbox"]:checked ~ .ac-text { color: #10b981; text-decoration: line-through; }
+    .modal .m-section { margin-bottom: 1rem; }
+    .modal .m-section h3 {
+      font-size: 0.75rem; font-weight: 600; color: #64748b;
+      text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.4rem;
+    }
+    .modal .m-info {
+      display: flex; gap: 0.5rem; flex-wrap: wrap; font-size: 0.75rem; color: #64748b;
+    }
+    .modal .m-info strong { color: #94a3b8; }
+
+    .modal .h-list { display: flex; flex-direction: column; gap: 0; }
+    .modal .h-entry {
+      display: grid; grid-template-columns: 9rem 6rem 1fr; gap: 0.5rem;
+      padding: 0.3rem 0; border-bottom: 1px solid #0f172a; font-size: 0.72rem; align-items: baseline;
+    }
+    .modal .h-entry:last-child { border-bottom: none; }
+    .modal .h-ts { color: #475569; font-family: 'SF Mono', monospace; white-space: nowrap; }
+    .modal .h-by {
+      font-weight: 700; padding: 0.05rem 0.35rem; border-radius: 4px;
+      background: #1e3a5f; color: #60a5fa; font-size: 0.65rem; text-align: center;
+      white-space: nowrap; width: fit-content;
+    }
+    .modal .h-by.by-refine { background: #451a03; color: #fb923c; }
+    .modal .h-by.by-tdd { background: #1e3a5f; color: #60a5fa; }
+    .modal .h-by.by-secops-tm, .modal .h-by.by-secops-cr { background: #2e1065; color: #c4b5fd; }
+    .modal .h-by.by-qa { background: #500724; color: #f9a8d4; }
+    .modal .h-by.by-simplify { background: #042f2e; color: #5eead4; }
+    .modal .h-by.by-dashboard { background: #1e293b; color: #64748b; }
+    .modal .h-changes { color: #94a3b8; }
+
+    @media (max-width: 900px) {
+      .kanban { flex-direction: column; }
+      .kcol { min-width: 100%; }
+      .stats-bar { gap: 0.5rem; font-size: 0.7rem; }
+      .stats-bar .s-item { flex: 1 1 80px; }
+    }
+  </style>
+</head>
+<body>
+<div class="kanban-wrap">
+  <div class="kb-header">
+    <h1>Kanban <small>Stories</small></h1>
+    <div class="spacer"></div>
+    <input class="search" id="kb-search" type="text" placeholder="Rechercher...">
+    <div class="toggle-group">
+      <button class="active" data-view="kanban">Kanban</button>
+      <button data-view="list">Liste</button>
+    </div>
+    <div class="trigger-toggle" id="kb-trigger-toggle" title="Déclencher automatiquement OpenCode lors d'un glissement vers Raffinement">
+      <span class="indicator on" id="kb-trigger-dot"></span>
+      <i class="ti ti-brand-open-source"></i> Auto
+      <span class="indicator off" id="kb-oc-status" style="width:6px;height:6px;margin-left:2px" title="Vérification OpenCode..."></span>
+    </div>
+    <button class="new-btn" id="kb-new"><i class="ti ti-plus"></i> Nouvelle US</button>
+  </div>
+
+  <div class="stats-bar" id="kb-stats"></div>
+
+  <div class="kanban" id="kb-kanban">
+    <div class="kcol kcol-pending" data-status="pending">
+      <div class="kcol-header">En attente <span class="count" data-count="pending">0</span></div>
+      <div class="kcol-list" data-list="pending"></div>
+    </div>
+    <div class="kcol kcol-refining" data-status="refining">
+      <div class="kcol-header">Raffinement <span class="count" data-count="refining">0</span></div>
+      <div class="kcol-list" data-list="refining"></div>
+    </div>
+    <div class="kcol kcol-secops_tm" data-status="secops_tm">
+      <div class="kcol-header">SecOps <span class="count" data-count="secops_tm">0</span></div>
+      <div class="kcol-list" data-list="secops_tm"></div>
+    </div>
+    <div class="kcol kcol-tdd" data-status="tdd">
+      <div class="kcol-header">TDD <span class="count" data-count="tdd">0</span></div>
+      <div class="kcol-list" data-list="tdd"></div>
+    </div>
+    <div class="kcol kcol-secops_cr" data-status="secops_cr">
+      <div class="kcol-header">SecOps Rev <span class="count" data-count="secops_cr">0</span></div>
+      <div class="kcol-list" data-list="secops_cr"></div>
+    </div>
+    <div class="kcol kcol-qa" data-status="qa">
+      <div class="kcol-header">QA <span class="count" data-count="qa">0</span></div>
+      <div class="kcol-list" data-list="qa"></div>
+    </div>
+    <div class="kcol kcol-simplify" data-status="simplify">
+      <div class="kcol-header">Simplify <span class="count" data-count="simplify">0</span></div>
+      <div class="kcol-list" data-list="simplify"></div>
+    </div>
+    <div class="kcol kcol-commit_ready" data-status="commit_ready">
+      <div class="kcol-header">Prêt commit <span class="count" data-count="commit_ready">0</span></div>
+      <div class="kcol-list" data-list="commit_ready"></div>
+    </div>
+    <div class="kcol kcol-completed" data-status="completed">
+      <div class="kcol-header">Terminé <span class="count" data-count="completed">0</span></div>
+      <div class="kcol-list" data-list="completed"></div>
+    </div>
+    <div class="kcol kcol-blocked" data-status="blocked">
+      <div class="kcol-header">Bloqué <span class="count" data-count="blocked">0</span></div>
+      <div class="kcol-list" data-list="blocked"></div>
+    </div>
+  </div>
+
+  <div class="list-view" id="kb-list">
+    <table>
+      <thead>
+        <tr>
+          <th data-sort="id">ID</th>
+          <th data-sort="title">Titre</th>
+          <th data-sort="phase">Phase</th>
+          <th data-sort="priority">Priorité</th>
+          <th data-sort="status">Statut</th>
+          <th data-sort="tdd_status">TDD</th>
+          <th data-sort="qa_status">QA</th>
+        </tr>
+      </thead>
+      <tbody id="kb-list-body"></tbody>
+    </table>
+  </div>
+</div>
+
+<div class="toast-container" id="kb-toasts"></div>
+
+<div class="modal-overlay" id="kb-modal">
+  <div class="modal">
+    <button class="modal-close" id="modal-close"><i class="ti ti-x"></i></button>
+    <h2 id="modal-title">Éditer US</h2>
+    <div id="modal-body"></div>
+  </div>
+</div>
+
+<script src="/static/app.js"></script>
+</body>
+</html>
