@@ -282,6 +282,28 @@
     .modal .rd-q { display: block; color: #64748b; font-style: italic; margin-bottom: 0.2rem; }
     .modal .rd-decision { display: block; color: #cbd5e1; }
 
+    /* Tabs */
+    .modal-tabs {
+      display: flex; border-bottom: 1px solid #334155;
+      margin: 0.5rem -1.5rem 0; padding: 0 1.5rem;
+    }
+    .tab-btn {
+      position: relative; padding: 0.5rem 1rem; background: transparent;
+      border: none; border-bottom: 2px solid transparent; margin-bottom: -1px;
+      color: #64748b; cursor: pointer; font-size: 0.78rem; font-weight: 500;
+      transition: color 0.15s, border-color 0.15s;
+    }
+    .tab-btn:hover { color: #94a3b8; }
+    .tab-btn.active { color: #e2e8f0; border-bottom-color: #c41e3a; }
+    .tab-dot {
+      display: inline-block; width: 5px; height: 5px; border-radius: 50%;
+      background: #fb923c; margin-left: 5px; vertical-align: middle;
+      position: relative; top: -1px;
+    }
+    .tab-panel { display: none; padding-top: 1rem; }
+    .tab-panel.active { display: block; }
+    .tab-empty { color: #475569; font-size: 0.78rem; padding: 1rem 0; text-align: center; }
+
     /* Implementation guide */
     .modal .ig-body { display: flex; flex-direction: column; gap: 0.65rem; }
     .modal .ig-meta-row { display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap; }

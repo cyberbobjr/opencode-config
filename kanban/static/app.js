@@ -285,6 +285,16 @@
     const overlay = document.getElementById("kb-modal");
     document.getElementById("modal-title").textContent = `✏️ ${s.id}`;
     document.getElementById("modal-body").innerHTML = modalContent(s);
+
+    document.querySelectorAll(".tab-btn").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        document.querySelectorAll(".tab-btn").forEach((b) => b.classList.remove("active"));
+        document.querySelectorAll(".tab-panel").forEach((p) => p.classList.remove("active"));
+        btn.classList.add("active");
+        document.querySelector(`.tab-panel[data-panel="${btn.dataset.tab}"]`).classList.add("active");
+      });
+    });
+
     overlay.classList.add("open");
   }
 
@@ -403,7 +413,11 @@
     const tddStatuses = ["pending", "in_progress", "passed", "failed"];
     const qaStatuses = ["pending", "in_progress", "passed", "failed"];
 
-    return `<div class="m-inline">
+    const hasRefine = (s.refine_decisions || []).length > 0 ||
+      (s.implementation_guide && Object.keys(s.implementation_guide).length > 0);
+
+    return `
+    <div class="m-inline">
       <div class="m-row"><label>ID</label><input type="text" id="me-id" value="${s.id}" readonly style="color:#64748b"></div>
       <div class="m-row"><label>Phase</label><input type="text" value="Phase ${s.phase} — ${escHtml(s.phase_name)}" readonly style="color:#64748b"></div>
     </div>
@@ -420,54 +434,75 @@
       <h3>Stack / Catégories</h3>
       <div class="stack-tags" id="me-stack">${stackHtml}</div>
     </div>
-    <div class="m-row"><label>Description</label><textarea id="me-desc" rows="3">${escHtml(s.description || "")}</textarea></div>
-    <div class="m-section">
-      <h3>Critères d'acceptation</h3>
-      <div id="me-acs">${acs}</div>
+
+    <div class="modal-tabs">
+      <button class="tab-btn active" data-tab="spec">Spécification</button>
+      <button class="tab-btn" data-tab="refine">Raffinement${hasRefine ? '<span class="tab-dot"></span>' : ''}</button>
+      <button class="tab-btn" data-tab="progress">Avancement</button>
+      <button class="tab-btn" data-tab="history">Historique</button>
     </div>
-    ${refinementSection(s)}
-    ${implementationGuideSection(s)}
-    <div class="m-row"><label>Notes</label><textarea id="me-notes" rows="2">${escHtml(s.notes || "")}</textarea></div>
-    <div class="m-section">
-      <h3>TDD</h3>
-      <div class="m-row">
-        <div class="m-inline-3 m-label-row">
-          <label>Statut</label><label>Tests</label><label>Coverage</label>
-        </div>
-        <div class="m-inline-3">
-          <select id="me-tdd-status">
-            ${tddStatuses.map((st) => `<option ${(s.tdd && s.tdd.status) === st ? "selected" : ""} value="${st}">${st}</option>`).join("")}
-          </select>
-          <input type="number" id="me-tdd-tests" value="${(s.tdd && s.tdd.tests) || 0}">
-          <input type="text" id="me-tdd-cov" value="${(s.tdd && s.tdd.coverage) || "0%"}">
-        </div>
+
+    <div class="tab-panel active" data-panel="spec">
+      <div class="m-row"><label>Description</label><textarea id="me-desc" rows="3">${escHtml(s.description || "")}</textarea></div>
+      <div class="m-section">
+        <h3>Critères d'acceptation</h3>
+        <div id="me-acs">${acs}</div>
       </div>
-      <div class="m-row"><label>Notes TDD</label><textarea id="me-tdd-notes" rows="1">${escHtml((s.tdd && s.tdd.notes) || "")}</textarea></div>
     </div>
-    <div class="m-section">
-      <h3>QA</h3>
-      <div class="m-row">
-        <div class="m-inline m-label-row">
-          <label>Statut</label><label>AC couverts</label>
+
+    <div class="tab-panel" data-panel="refine">
+      ${refinementSection(s)}
+      ${implementationGuideSection(s)}
+      ${!hasRefine ? '<p class="tab-empty">Aucun raffinement effectué sur cette story.</p>' : ''}
+    </div>
+
+    <div class="tab-panel" data-panel="progress">
+      <div class="m-row"><label>Notes</label><textarea id="me-notes" rows="2">${escHtml(s.notes || "")}</textarea></div>
+      <div class="m-section">
+        <h3>TDD</h3>
+        <div class="m-row">
+          <div class="m-inline-3 m-label-row">
+            <label>Statut</label><label>Tests</label><label>Coverage</label>
+          </div>
+          <div class="m-inline-3">
+            <select id="me-tdd-status">
+              ${tddStatuses.map((st) => `<option ${(s.tdd && s.tdd.status) === st ? "selected" : ""} value="${st}">${st}</option>`).join("")}
+            </select>
+            <input type="number" id="me-tdd-tests" value="${(s.tdd && s.tdd.tests) || 0}">
+            <input type="text" id="me-tdd-cov" value="${(s.tdd && s.tdd.coverage) || "0%"}">
+          </div>
         </div>
-        <div class="m-inline">
-          <select id="me-qa-status">
-            ${qaStatuses.map((st) => `<option ${(s.qa && s.qa.status) === st ? "selected" : ""} value="${st}">${st}</option>`).join("")}
-          </select>
-          <input type="text" id="me-qa-acs" value="${(s.qa && s.qa.ac_covered) || "0/0"}">
-        </div>
+        <div class="m-row"><label>Notes TDD</label><textarea id="me-tdd-notes" rows="1">${escHtml((s.tdd && s.tdd.notes) || "")}</textarea></div>
       </div>
-      <div class="m-row"><label>Notes QA</label><textarea id="me-qa-notes" rows="1">${escHtml((s.qa && s.qa.notes) || "")}</textarea></div>
+      <div class="m-section">
+        <h3>QA</h3>
+        <div class="m-row">
+          <div class="m-inline m-label-row">
+            <label>Statut</label><label>AC couverts</label>
+          </div>
+          <div class="m-inline">
+            <select id="me-qa-status">
+              ${qaStatuses.map((st) => `<option ${(s.qa && s.qa.status) === st ? "selected" : ""} value="${st}">${st}</option>`).join("")}
+            </select>
+            <input type="text" id="me-qa-acs" value="${(s.qa && s.qa.ac_covered) || "0/0"}">
+          </div>
+        </div>
+        <div class="m-row"><label>Notes QA</label><textarea id="me-qa-notes" rows="1">${escHtml((s.qa && s.qa.notes) || "")}</textarea></div>
+      </div>
+      <div class="m-section">
+        <h3>SecOps CR — Commentaires</h3>
+        <div class="m-row"><textarea id="me-secops-comments" rows="2" placeholder="Observations, risques, recommandations...">${escHtml((s.secops_report && s.secops_report.comments) || "")}</textarea></div>
+      </div>
+      <div class="m-section">
+        <h3>Simplify — Commentaires</h3>
+        <div class="m-row"><textarea id="me-simplify-comments" rows="2" placeholder="Simplifications appliquées, refactoring noté...">${escHtml(s.simplify_comments || "")}</textarea></div>
+      </div>
     </div>
-    <div class="m-section">
-      <h3>SecOps CR — Commentaires</h3>
-      <div class="m-row"><textarea id="me-secops-comments" rows="2" placeholder="Observations, risques, recommandations...">${escHtml((s.secops_report && s.secops_report.comments) || "")}</textarea></div>
+
+    <div class="tab-panel" data-panel="history">
+      ${historySection(s)}
     </div>
-    <div class="m-section">
-      <h3>Simplify — Commentaires</h3>
-      <div class="m-row"><textarea id="me-simplify-comments" rows="2" placeholder="Simplifications appliquées, refactoring noté...">${escHtml(s.simplify_comments || "")}</textarea></div>
-    </div>
-    ${historySection(s)}
+
     <div class="m-actions">
       <button class="btn-danger" id="me-delete"><i class="ti ti-trash"></i> Supprimer</button>
       <div style="flex:1"></div>
