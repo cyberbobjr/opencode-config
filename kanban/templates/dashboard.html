@@ -338,8 +338,19 @@
     .modal .ig-create { border-left-color: #22c55e; }
     .modal .ig-modify { border-left-color: #f59e0b; }
     .modal .ig-delete { border-left-color: #ef4444; }
-    .modal .ig-steps ol { padding-left: 1.2rem; display: flex; flex-direction: column; gap: 0.25rem; }
-    .modal .ig-steps li { font-size: 0.75rem; color: #cbd5e1; line-height: 1.4; }
+    .modal .ig-steps { display: flex; flex-direction: column; gap: 0.3rem; }
+    .modal .ig-step {
+      display: flex; align-items: flex-start; gap: 0.55rem;
+      padding: 0.4rem 0.6rem; background: #0c1320;
+      border-radius: 5px; border-left: 3px solid #6366f1;
+    }
+    .modal .ig-step-num {
+      font-size: 0.6rem; font-weight: 700; color: #fff;
+      background: #6366f1; border-radius: 3px;
+      padding: 0.05rem 0.3rem; min-width: 1.1rem; text-align: center;
+      flex-shrink: 0; margin-top: 0.1rem;
+    }
+    .modal .ig-step-text { font-size: 0.73rem; color: #cbd5e1; line-height: 1.45; }
     .modal .ig-bottom-row {
       display: flex; gap: 0.5rem; font-size: 0.72rem; color: #94a3b8;
       padding: 0.35rem 0.55rem; background: #0c1320; border-radius: 5px;

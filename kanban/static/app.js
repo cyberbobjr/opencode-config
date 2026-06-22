@@ -355,7 +355,9 @@
     const stepsHtml = ig.steps && ig.steps.length
       ? `<div class="ig-steps-section">
           <div class="ig-sub-label">Séquence d'implémentation</div>
-          <ol class="ig-steps">${ig.steps.map((st) => `<li>${escHtml(st.replace(/^\d+\.\s*/, ""))}</li>`).join("")}</ol>
+          <div class="ig-steps">${ig.steps.map((st, i) =>
+            `<div class="ig-step"><span class="ig-step-num">${i + 1}</span><span class="ig-step-text">${escHtml(st.replace(/^\d+\.\s*/, ""))}</span></div>`
+          ).join("")}</div>
         </div>`
       : "";
 
