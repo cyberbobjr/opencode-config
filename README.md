@@ -11,8 +11,9 @@ At its core: a Kanban server that works simultaneously as a **web dashboard**, a
 - **A Kanban board** connected to your agent via MCP — stories move through columns as the agent works
 - **A bidirectional bridge** — dragging a card on the dashboard injects a slash command into the OpenCode TUI
 - **Slash commands** for every stage of the development cycle (refinement, TDD, security review, QA, commit)
-- **Sub-agents** for code quality, reuse, and efficiency review
+- **Isolated sub-agents** for TDD, QA, SecOps code review, and code simplification — each runs in its own context with injected story data
 - **A structured pipeline** that enforces TDD, SecOps review, and QA validation before any commit
+- **Story qualification** — `/fix`, `/feature`, `/change` scan the codebase and produce a normalized story draft before persisting
 
 ---
 
@@ -23,23 +24,26 @@ At its core: a Kanban server that works simultaneously as a **web dashboard**, a
 ├── opencode.json          — MCP server configuration (consumed by OpenCode)
 ├── package.json           — Node dependencies (optional tooling)
 │
-├── commands/              — Slash commands available in OpenCode
+├── commands/              — Slash commands (prompts injected into OpenCode's main agent)
 │   ├── next-story.md      — Workflow coordinator: full cycle or individual steps
-│   ├── refine.md          — Refinement agent (8–12 questions, 4 roles)
-│   ├── tdd.md             — TDD agent (red → green → refactor)
-│   ├── secops.md          — DevSecOps agent (threat model + code review)
-│   ├── qa.md              — QA agent (AC validation through tests)
+│   ├── refine.md          — Refinement: 8–12 questions, 4 roles (PO/Architect/Dev/DevSecOps)
+│   ├── tdd.md             — Thin wrapper → launches tdd subagent via Task tool
+│   ├── secops.md          — Threat model (inline) + code review wrapper → launches secops-cr subagent
+│   ├── qa.md              — Thin wrapper → launches qa subagent via Task tool
+│   ├── simplify.md        — Launches 3 simplify sub-agents in parallel via Task tool
 │   ├── architect.md       — Architecture design (question/answer cycle)
-│   ├── simplify.md        — Code quality review (3 sub-agents)
 │   ├── review-pr.md       — GitHub PR review and response
 │   ├── commit.md          — Conventional commit helper
-│   ├── feature.md         — Create a new feature story (backlog only)
-│   ├── fix.md             — Create a bug story (backlog only)
-│   └── change.md          — Create a change story (backlog only)
+│   ├── feature.md         — Create a new feature story with qualification phase
+│   ├── fix.md             — Create a bug story with qualification phase
+│   └── change.md          — Create a change story with impact analysis
 │
-├── agents/                — Reusable sub-agents (called by commands)
-│   ├── code-simplify-quality.md
+├── agents/                — Sub-agents (mode: subagent, isolated context, own permissions)
+│   ├── tdd.md             — RED/GREEN/REFACTOR cycle, writes tests first, then code
+│   ├── qa.md              — AC validation through integration and E2E tests
+│   ├── secops-cr.md       — OWASP code review (read+bash only, non-invasive)
 │   ├── code-simplify-reuse.md
+│   ├── code-simplify-quality.md
 │   └── code-simplify-efficiency.md
 │
 └── kanban/                — Kanban MCP server
@@ -66,6 +70,8 @@ pip install -r .opencode/kanban/requirements.txt
 
 ### 2. Start the Kanban server
 
+OpenCode automatically starts the server via MCP. You can also run it manually:
+
 ```bash
 # Dashboard + MCP (standard mode)
 python .opencode/kanban/server.py --mcp
@@ -75,6 +81,8 @@ python .opencode/kanban/server.py --mcp --debug
 ```
 
 Dashboard: `http://localhost:8765`
+
+> **Important**: let OpenCode start the server — it binds both MCP (stdio) and HTTP (port 8765) in the same process. Running a second instance creates two separate processes with desynchronized state.
 
 ### 3. Configure OpenCode
 
@@ -86,7 +94,7 @@ The `opencode.json` at the root of this repo already wires the Kanban server as 
   "mcp": {
     "kanban": {
       "type": "local",
-      "command": ["python", ".opencode/kanban/server.py", "--mcp"],
+      "command": ["python", ".opencode/kanban/server.py", "--mcp", "--debug"],
       "enabled": true
     }
   }
@@ -114,10 +122,10 @@ pending → refining → secops_tm → tdd → secops_cr → qa → simplify →
 | `pending` | Story is waiting — not yet refined |
 | `refining` | `/refine` challenges the ACs through an 8–12 question dialogue |
 | `secops_tm` | `/secops mode=threat-model` identifies attack surfaces before coding |
-| `tdd` | `/tdd` implements the story with Red → Green → Refactor |
-| `secops_cr` | `/secops mode=code-review` audits the diff against an OWASP checklist |
-| `qa` | `/qa` validates every AC with integration or E2E tests |
-| `simplify` | 3 sub-agents review for quality, reuse, and efficiency |
+| `tdd` | `tdd` subagent implements the story with Red → Green → Refactor |
+| `secops_cr` | `secops-cr` subagent audits the diff against an OWASP checklist |
+| `qa` | `qa` subagent validates every AC with integration or E2E tests |
+| `simplify` | 3 sub-agents review for quality, reuse, and efficiency in parallel |
 | `commit_ready` | User approves the commit message |
 | `completed` | Story committed and done |
 
@@ -128,6 +136,64 @@ Start the full cycle with:
 ```
 
 Or drive individual steps from the dashboard by dragging cards between columns — the server injects the right command into OpenCode automatically.
+
+---
+
+## Three interaction modes
+
+The same pipeline can be driven three ways, with different levels of automation:
+
+### 1. `/next-story US X.Y` — Fully automatic
+
+The pipeline runs end-to-end with minimal interruptions:
+- Sub-agents execute in sequence, each receives story context via Task tool injection
+- **2 fixed stop points**: after refinement (before coding) and before commit
+- **1 conditional stop**: if QA fails — user decides how to proceed
+- Sub-agents do not ask about advancing to the next stage
+
+### 2. Manual commands — Single step
+
+`/tdd US X.Y`, `/qa US X.Y`, `/secops US X.Y mode=code-review`, etc.
+
+Each command runs one stage, then asks:
+> "✅ Done — proceed to [next stage]? [yes / no]"
+
+This gives granular control when you want to inspect results between stages.
+
+### 3. Drag-and-drop on the dashboard
+
+Every column move routes through `/next-story` with the matching sub-command:
+
+| Column dragged to | Command injected |
+|-------------------|-----------------|
+| `refining` | `/next-story refine US X.Y` |
+| `secops_tm` | `/next-story secops-tm US X.Y` |
+| `tdd` | `/next-story implement US X.Y` |
+| `secops_cr` | `/next-story secops-cr US X.Y` |
+| `qa` | `/next-story qa US X.Y` |
+| `simplify` | `/next-story simplify US X.Y` |
+| `commit_ready` | `/next-story commit US X.Y` |
+
+---
+
+## Commands vs Agents
+
+OpenCode distinguishes two concepts:
+
+| | Commands | Agents |
+|--|----------|--------|
+| Defined in | `commands/*.md` | `agents/*.md` |
+| Context | Injected into the **main agent** | **Isolated** — own context window |
+| Invocation | `/command-name` by the user | Task tool (`subagent_type`) by a command |
+| `question` tool | ✅ Available | ❌ Not available |
+| Permissions | Inherits from main agent | Defined in agent frontmatter |
+| Use case | Orchestration, interactive Q&A | Execution with isolated, injected context |
+
+**What this means in practice:**
+
+- `refine.md` and `secops.md` (threat-model) stay as **commands** — they need the `question` tool for interactive Q&A
+- `tdd.md`, `qa.md`, `secops.md` (code-review) are **thin wrappers**: they gather context (story JSON + AGENTS.md), then launch their matching sub-agent via Task tool
+- Sub-agents receive all context in the Task tool prompt — they don't read `$ARGUMENTS` directly
 
 ---
 
@@ -159,7 +225,7 @@ Key rule: **moves made by the agent do not trigger dashboard commands** (agents 
 
 ## MCP tools
 
-The Kanban server exposes 7 tools under the name `kanban-stories`:
+The Kanban server exposes 7 tools:
 
 | Tool | Description |
 |------|-------------|
@@ -167,7 +233,7 @@ The Kanban server exposes 7 tools under the name `kanban-stories`:
 | `kanban-list-stories` | List stories, filtered by status or phase |
 | `kanban-update-story` | Partially update a story (TDD results, ACs, implementation guide…) |
 | `kanban-move-story` | Move a story to a new column + log the change |
-| `kanban-create-story` | Create a new story (used by `/feature`, `/fix`, `/change`) |
+| `kanban-create-story` | Create a new story — always sets `status: pending` |
 | `kanban-get-next-pending` | Get the highest-priority pending story |
 | `kanban-get-stats` | Get global pipeline counts |
 
@@ -182,18 +248,52 @@ All commands are stack-agnostic. They reference `AGENTS.md` in your project root
 | Command | Purpose |
 |---------|---------|
 | `/next-story` | Show project status and next pending story |
-| `/next-story US X.Y` | Run the full cycle for a story |
-| `/refine US X.Y` | Challenge ACs through a structured dialogue (4 roles, 8–12 questions) |
-| `/tdd US X.Y` | Implement with TDD (delegates to the story's `implementation_guide`) |
-| `/secops US X.Y` | Security review — threat model or code review mode |
-| `/qa US X.Y` | Validate every AC with tests |
+| `/next-story US X.Y` | Run the full pipeline for a story (2 stop points) |
+| `/refine US X.Y` | Challenge ACs through a structured dialogue (4 roles, 8–12 questions via `question` tool) |
+| `/tdd US X.Y` | Assemble story context → launch `tdd` subagent → handle advance |
+| `/secops US X.Y` | Threat model (inline, interactive) or code review (launches `secops-cr` subagent) |
+| `/qa US X.Y` | Assemble story context → launch `qa` subagent → handle advance |
+| `/simplify [US X.Y]` | Launch 3 simplify sub-agents in parallel, fix findings, optionally persist report |
 | `/architect` | Design a feature before implementing (question/answer cycle) |
-| `/simplify` | Code quality review by 3 sub-agents |
 | `/review-pr [number]` | Fetch GitHub PR comments, classify, fix, reply |
 | `/commit` | Propose and create a conventional commit |
-| `/feature "..."` | Create a new feature story in the backlog (no implementation) |
-| `/fix "..."` | Create a bug story in the backlog (no implementation) |
-| `/change "..."` | Create a change story in the backlog (no implementation) |
+| `/feature "..."` | Qualify (scan + title + description + stack) → preview → create pending story |
+| `/fix "..."` | Qualify bug (scan + "Fix — " title + Bug/Contexte/Attendu + stack) → create pending |
+| `/change "..."` | Qualify change (impact scan + Motivation/Périmètre/Risques + stack) → create pending |
+
+---
+
+## Story creation and qualification
+
+`/fix`, `/feature`, and `/change` run a **qualification phase** before creating the story:
+
+1. **Context scan** — grep the codebase, check `kanban-list-stories` (for `/change`), read `AGENTS.md`
+2. **Fill the schema**:
+
+| Field | Rule |
+|-------|------|
+| `title` | Normalized, ≤60 chars, type-specific format (see below) |
+| `description` | Type-specific template (see below) |
+| `priority` | P1 for bugs, P2 for features/changes — adjustable |
+| `stack` | Inferred from codebase scan — always filled |
+| `notes` | Reproduction context, impacted stories, open questions |
+
+3. **Preview + confirm** — one confirmation block before persisting
+4. **Create** — `kanban-create-story` (title, priority, phase) then `kanban-update-story` (description, stack, notes)
+
+**Title formats:**
+
+| Command | Format | Example |
+|---------|--------|---------|
+| `/feature` | Imperative verb + subject | `"Exporter les briefings en CSV"` |
+| `/fix` | `"Fix — [bug description]"` | `"Fix — refresh token expiré prématurément"` |
+| `/change` | `"Change — [what changes]"` | `"Change — migration SQLite vers PostgreSQL"` |
+
+**Description templates:**
+
+- `/feature` → `"En tant que [role], je veux [feature], afin de [benefit]."`
+- `/fix` → `"**Bug:** [...]. **Contexte:** [...]. **Attendu:** [...]."` (3 parts)
+- `/change` → `"**Motivation:** [...]. **Périmètre:** [...]. **Risques:** [...]."` (3 parts)
 
 ---
 
@@ -243,17 +343,23 @@ Each story is stored as `user-stories/us-X-Y.json`:
 {
   "id": "US 1.3",
   "phase": 1,
+  "phase_name": "...",
   "title": "...",
+  "description": "...",       // filled by /feature, /fix, /change or /refine
   "status": "pending",
-  "priority": "P0",
+  "priority": "P0",           // P0 | P1 | P2
+  "stack": ["backend"],       // filled by /feature, /fix, /change or /refine
   "acceptance_criteria": [
     {"id": 1, "text": "...", "checked": false}
   ],
-  "tdd": {"status": "pending", "tests": 0, "coverage": "0%"},
-  "qa":  {"status": "pending", "ac_covered": "0/0"},
-  "implementation_guide": {},   // filled by /refine
-  "secops_report": {},          // filled by /secops
-  "history": []                 // append-only audit trail
+  "tdd": {"status": "pending", "tests": 0, "coverage": "0%", "notes": ""},
+  "qa":  {"status": "pending", "ac_covered": "0/0", "notes": "", "ac_failures": []},
+  "implementation_guide": {}, // filled by /refine
+  "refine_decisions": [],     // filled by /refine
+  "secops_report": {},        // filled by /secops (both modes)
+  "simplify_report": {},      // filled by /simplify
+  "notes": "",
+  "history": []               // append-only audit trail
 }
 ```
 
