@@ -144,9 +144,17 @@ Fix all issues before moving to the next step.
 
 ### 6. Report
 
-1. Mark `tdd.status = passed` (or `failed`) via:
+1. Compose a `notes` summary covering:
+   - Files created and files modified (paths, what was added or changed)
+   - Key implementation choices (e.g. "chose service layer pattern", "added load_dotenv before Settings()")
+   - Test types used (unit, integration, E2E) and what scenarios they cover
+   - Any edge cases left uncovered or caveats
+
+   Keep it to 3–6 lines — enough for a reviewer to understand what was built without reading the diff.
+
+2. Mark `tdd.status = passed` (or `failed`) via:
    ```
-   kanban-update-story("[story_id]", '{"_actor": "tdd", "tdd": {"status": "passed", "tests": 10, "coverage": "92%", "notes": "All tests pass"}}')
+   kanban-update-story("[story_id]", '{"_actor": "tdd", "tdd": {"status": "passed", "tests": 10, "coverage": "92%", "notes": "<your composed summary>"}}')
    ```
 
 2. **Advance to security code review:**

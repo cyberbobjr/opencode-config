@@ -2,7 +2,39 @@
 (function () {
   const API = "/api/stories";
   let stories = [];
+  let historyData = [];
+  let activeStoryId = null;
   let autoTrigger = localStorage.getItem("kanban-auto-trigger") !== "false";
+
+  const STATUS_LABELS = {
+    pending: "En attente", refining: "Raffinement", secops_tm: "SecOps TM",
+    tdd: "TDD", secops_cr: "SecOps CR", qa: "QA", simplify: "Simplify",
+    commit_ready: "Prêt commit", completed: "Terminé", blocked: "Bloqué",
+  };
+  const STATUS_COLORS = {
+    pending: "#6b7280", refining: "#f59e0b", secops_tm: "#7c3aed",
+    tdd: "#3b82f6", secops_cr: "#a78bfa", qa: "#ec4899", simplify: "#14b8a6",
+    commit_ready: "#10b981", completed: "#065f46", blocked: "#ef4444",
+  };
+
+  const SIMPLE_GROUPS = [
+    { id: "backlog",    label: "Backlog",         color: "#6b7280", statuses: ["pending"],                              dropTo: "pending"      },
+    { id: "en_cours",  label: "En cours",         color: "#3b82f6", statuses: ["refining", "secops_tm", "tdd", "secops_cr"], dropTo: "tdd"    },
+    { id: "validation",label: "Validation",       color: "#ec4899", statuses: ["qa", "simplify"],                       dropTo: "qa"           },
+    { id: "pret",      label: "Prêt",             color: "#10b981", statuses: ["commit_ready"],                         dropTo: "commit_ready" },
+    { id: "termine",   label: "Terminé / Bloqué", color: "#065f46", statuses: ["completed", "blocked"],                 dropTo: "completed"    },
+  ];
+
+  const PIPELINE_STEPS = [
+    { status: "refining",     label: "Raffinement" },
+    { status: "secops_tm",    label: "Threat Model" },
+    { status: "tdd",          label: "TDD" },
+    { status: "secops_cr",    label: "SecOps CR" },
+    { status: "qa",           label: "QA" },
+    { status: "simplify",     label: "Simplify" },
+    { status: "commit_ready", label: "Commit" },
+    { status: "completed",    label: "Terminé" },
+  ];
 
   // ── Toast ────────────────────────────────────────────────────────
   function showToast(message, variant = "success") {
@@ -39,6 +71,16 @@
     render();
   }
 
+  async function loadHistory() {
+    try {
+      const r = await fetch("/api/history?limit=150");
+      historyData = await r.json();
+    } catch {
+      historyData = [];
+    }
+    renderJournal();
+  }
+
   async function updateStory(id, data) {
     const url = new URL(`${API}/${encodeURIComponent(id)}`, location.origin);
     if (!autoTrigger) url.searchParams.set("no_trigger", "1");
@@ -52,12 +94,26 @@
       const tr = result._trigger;
       if (tr.triggered) {
         showToast(`OpenCode ← ${tr.command}`);
-      } else if (tr.disabled) {
       } else if (tr.error) {
         showToast(`⚠ OpenCode injoignable — ${tr.error}. Lance 'opencode --port 4096'`, "warning");
       }
     } else if (data.status === "refining" && !autoTrigger) {
       showToast(`⏸ Auto-trigger désactivé — active le bouton "Auto" pour lancer OpenCode`, "warning");
+    }
+    await loadStories();
+  }
+
+  async function moveStory(id, newStatus, actor = "dashboard") {
+    const url = new URL(`${API}/${encodeURIComponent(id)}/move`, location.origin);
+    if (!autoTrigger) url.searchParams.set("no_trigger", "1");
+    const r = await fetch(url.toString(), {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status: newStatus, actor }),
+    });
+    const result = await r.json();
+    if (result && result._trigger && result._trigger.triggered) {
+      showToast(`OpenCode ← ${result._trigger.command}`);
     }
     await loadStories();
   }
@@ -81,13 +137,19 @@
     renderKanban();
     renderStats();
     renderList();
+    renderSimple();
+    renderFocus();
     updateCounts();
     updateView();
   }
 
+  function getActiveView() {
+    const btn = document.querySelector(".toggle-group button.active");
+    return btn ? btn.dataset.view : "kanban";
+  }
+
   function filterText() {
-    const q = document.getElementById("kb-search").value.toLowerCase();
-    return q;
+    return document.getElementById("kb-search").value.toLowerCase();
   }
 
   function matches(s, q) {
@@ -134,16 +196,21 @@
     return st === "passed" ? "✓" : st === "failed" ? "✗" : st === "in_progress" ? "◌" : "○";
   }
 
-  function cardHtml(s) {
+  function cardHtml(s, showStatus = false) {
     const q = filterText();
     if (!matches(s, q)) return "";
+    const st = colStatus(s);
+    const stColor = STATUS_COLORS[st] || "#64748b";
+    const statusBadge = showStatus
+      ? `<span class="c-badge" style="background:${stColor}20;color:${stColor};border:1px solid ${stColor}44">${STATUS_LABELS[st] || st}</span>`
+      : "";
     return `<div class="card" data-id="${s.id}">
       <div class="c-top">
         <span class="c-id">${s.id}</span>
         <span class="c-prio ${s.priority}">${s.priority}</span>
       </div>
       <div class="c-title">${escHtml(s.title || "")}</div>
-      <div class="c-badges">${tddBadge(s)}${qaBadge(s)}${stackBadges(s)}</div>
+      <div class="c-badges">${statusBadge}${tddBadge(s)}${qaBadge(s)}${stackBadges(s)}</div>
     </div>`;
   }
 
@@ -153,8 +220,172 @@
       const items = stories
         .filter((s) => colStatus(s) === status)
         .sort((a, b) => (a.order ?? 9999) - (b.order ?? 9999) || a.id.localeCompare(b.id));
-      el.innerHTML = items.map(cardHtml).join("");
+      el.innerHTML = items.map((s) => cardHtml(s)).join("");
     });
+  }
+
+  // ── Simple view (5 meta-columns) ─────────────────────────────────
+  function renderSimple() {
+    const container = document.getElementById("kb-simple");
+    if (!container) return;
+    const q = filterText();
+    container.innerHTML = SIMPLE_GROUPS.map((grp) => {
+      const items = stories
+        .filter((s) => grp.statuses.includes(colStatus(s)) && matches(s, q))
+        .sort((a, b) => (a.order ?? 9999) - (b.order ?? 9999) || a.id.localeCompare(b.id));
+      return `<div class="scol" data-group="${grp.id}" data-drop-to="${grp.dropTo}" style="--grp-color:${grp.color}">
+        <div class="scol-header" style="color:${grp.color}">
+          ${grp.label} <span class="count">${items.length}</span>
+        </div>
+        <div class="scol-list" data-slist="${grp.id}">
+          ${items.map((s) => cardHtml(s, true)).join("")}
+        </div>
+      </div>`;
+    }).join("");
+    initSimpleSortable();
+  }
+
+  function initSimpleSortable() {
+    document.querySelectorAll(".scol-list").forEach((el) => {
+      if (el._sortable) { el._sortable.destroy(); }
+      el._sortable = Sortable.create(el, {
+        group: "simple-kanban",
+        animation: 200,
+        ghostClass: "sortable-ghost",
+        chosenClass: "sortable-chosen",
+        onEnd: async function (evt) {
+          const storyId = evt.item.dataset.id;
+          const newCol = evt.to.closest(".scol");
+          const oldCol = evt.from.closest(".scol");
+          if (!newCol || !oldCol || newCol.dataset.group === oldCol.dataset.group) return;
+          await moveStory(storyId, newCol.dataset.dropTo);
+        },
+      });
+    });
+  }
+
+  // ── Focus view (active story pipeline) ───────────────────────────
+  function getActiveStory() {
+    const pinned = activeStoryId && stories.find((x) => x.id === activeStoryId);
+    if (pinned) return pinned;
+    const inProgress = stories.filter((s) => !["pending", "completed", "blocked"].includes(colStatus(s)));
+    if (!inProgress.length) return null;
+    inProgress.sort((a, b) => {
+      const aTs = (a.history || []).slice(-1)[0]?.ts || "";
+      const bTs = (b.history || []).slice(-1)[0]?.ts || "";
+      return bTs.localeCompare(aTs);
+    });
+    return inProgress[0];
+  }
+
+  function renderFocus() {
+    const container = document.getElementById("kb-focus");
+    if (!container) return;
+    const inProgress = stories.filter((s) => !["pending", "completed", "blocked"].includes(colStatus(s)));
+    const active = getActiveStory();
+
+    if (!active) {
+      container.innerHTML = `<div class="fv-empty"><p>Aucune story en cours.</p>
+        <p style="margin-top:0.5rem;color:#475569;font-size:0.8rem">Démarrez une story depuis le Kanban.</p></div>`;
+      return;
+    }
+
+    const currentIdx = PIPELINE_STEPS.findIndex((s) => s.status === colStatus(active));
+    const stepsHtml = PIPELINE_STEPS.map((step, idx) => {
+      const done = idx < currentIdx;
+      const current = idx === currentIdx;
+      const lineColor = idx < currentIdx ? "#10b981" : "#334155";
+      const connector = idx < PIPELINE_STEPS.length - 1
+        ? `<div class="fv-connector" style="background:${lineColor}"></div>`
+        : "";
+      return `<div class="fv-step-wrap">
+        <div class="fv-step">
+          <div class="fv-step-circle ${done ? "fv-done" : current ? "fv-current" : ""}">
+            ${done ? "✓" : idx + 1}
+          </div>
+          <div class="fv-step-label">${step.label}</div>
+        </div>${connector}
+      </div>`;
+    }).join("");
+
+    const picker = inProgress.length > 1
+      ? `<select id="fv-picker" class="fv-picker">${inProgress.map((s) =>
+          `<option value="${s.id}" ${s.id === active.id ? "selected" : ""}>${s.id} — ${escHtml(s.title)}</option>`
+        ).join("")}</select>`
+      : "";
+
+    const tddSt = (active.tdd || {}).status || "pending";
+    const qaSt  = (active.qa  || {}).status || "pending";
+    const coverage = (active.tdd || {}).coverage || "—";
+    const acTotal = (active.acceptance_criteria || []).length;
+    const acDone  = (active.acceptance_criteria || []).filter((a) => a.checked).length;
+
+    container.innerHTML = `<div class="fv-card">
+      <div class="fv-header">
+        <div class="fv-meta">
+          <span class="c-id">${active.id}</span>
+          <span class="c-prio ${active.priority}">${active.priority}</span>
+          <span class="fv-phase">Phase ${active.phase}</span>
+        </div>
+        ${picker}
+      </div>
+      <div class="fv-title">${escHtml(active.title || "")}</div>
+      <div class="fv-pipeline">${stepsHtml}</div>
+      <div class="fv-metrics">
+        <div class="fv-metric">
+          <span class="fv-metric-label">TDD</span>
+          <span class="c-badge ${tddSt}">TDD ${badgeIcon(tddSt)}</span>
+          <span class="fv-metric-val">${coverage}</span>
+        </div>
+        <div class="fv-metric">
+          <span class="fv-metric-label">QA</span>
+          <span class="c-badge ${qaSt}">QA ${badgeIcon(qaSt)}</span>
+        </div>
+        <div class="fv-metric">
+          <span class="fv-metric-label">ACs</span>
+          <span class="fv-metric-val">${acDone}/${acTotal} validés</span>
+        </div>
+      </div>
+      ${active.description ? `<div class="fv-desc">${escHtml(active.description)}</div>` : ""}
+    </div>`;
+
+    const pickerEl = document.getElementById("fv-picker");
+    if (pickerEl) {
+      pickerEl.addEventListener("change", (e) => {
+        activeStoryId = e.target.value;
+        renderFocus();
+      });
+    }
+  }
+
+  // ── Journal view (global activity) ───────────────────────────────
+  function renderJournal() {
+    const container = document.getElementById("kb-journal");
+    if (!container) return;
+    if (!historyData.length) {
+      container.innerHTML = `<p class="jv-empty">Aucun événement enregistré.</p>`;
+      return;
+    }
+    const byDay = {};
+    historyData.forEach((e) => {
+      const day = (e.ts || "").substring(0, 10) || "unknown";
+      (byDay[day] = byDay[day] || []).push(e);
+    });
+    container.innerHTML = Object.entries(byDay).map(([day, events]) => {
+      const evHtml = events.map((e) => {
+        const actor = (e.by || "?").replace(/[^a-z0-9-]/gi, "");
+        return `<div class="jv-event">
+          <span class="jv-time">${(e.ts || "").substring(11, 16)}</span>
+          <span class="h-by by-${actor}">${e.by || "?"}</span>
+          <span class="jv-story" data-id="${e.story_id}" title="${escHtml(e.story_title)}">${e.story_id}</span>
+          <span class="jv-changes">${escHtml((e.changes || []).join(" · "))}</span>
+        </div>`;
+      }).join("");
+      return `<div class="jv-day">
+        <div class="jv-day-label">${day}</div>
+        <div class="jv-day-events">${evHtml}</div>
+      </div>`;
+    }).join("");
   }
 
   function renderStats() {
@@ -194,28 +425,19 @@
     const tbody = document.getElementById("kb-list-body");
     const q = filterText();
     const items = stories.filter((s) => matches(s, q));
-    const labels = {
-      pending: "En attente", refining: "Raffinement", secops_tm: "SecOps",
-      tdd: "TDD", secops_cr: "SecOps Rev", qa: "QA", simplify: "Simplify",
-      commit_ready: "Prêt commit", completed: "Terminé", blocked: "Bloqué",
-    };
-    const colors = {
-      pending: "#6b7280", refining: "#f59e0b", secops_tm: "#7c3aed",
-      tdd: "#3b82f6", secops_cr: "#a78bfa", qa: "#ec4899", simplify: "#14b8a6",
-      commit_ready: "#10b981", completed: "#065f46", blocked: "#ef4444",
-    };
     tbody.innerHTML = items
-      .map(
-        (s) => `<tr data-id="${s.id}">
+      .map((s) => {
+        const st = colStatus(s);
+        return `<tr data-id="${s.id}">
           <td style="font-family:monospace;color:#64748b">${s.id}</td>
           <td>${escHtml(s.title)}</td>
           <td class="lv-phase">${s.phase}: ${escHtml(s.phase_name)}</td>
           <td><span class="c-prio ${s.priority}">${s.priority}</span></td>
-          <td><span class="lv-status" style="color:${colors[colStatus(s)]};background:${colors[colStatus(s)]}11">● ${labels[colStatus(s)] || colStatus(s)}</span></td>
+          <td><span class="lv-status" style="color:${STATUS_COLORS[st]};background:${STATUS_COLORS[st]}11">● ${STATUS_LABELS[st] || st}</span></td>
           <td>${badgeIcon((s.tdd && s.tdd.status) || "pending")}</td>
           <td>${badgeIcon((s.qa && s.qa.status) || "pending")}</td>
-        </tr>`
-      )
+        </tr>`;
+      })
       .join("");
   }
 
@@ -227,13 +449,12 @@
   }
 
   function updateView() {
-    const mode = document.querySelector(".toggle-group .active");
-    if (!mode) return;
-    const view = mode.dataset.view;
-    const kanban = document.getElementById("kb-kanban");
-    const list = document.getElementById("kb-list");
-    kanban.classList.toggle("hidden", view !== "kanban");
-    list.classList.toggle("visible", view === "list");
+    const view = getActiveView();
+    document.getElementById("kb-kanban").classList.toggle("hidden", view !== "kanban");
+    document.getElementById("kb-simple").classList.toggle("visible", view === "simple");
+    document.getElementById("kb-focus").classList.toggle("visible", view === "focus");
+    document.getElementById("kb-journal").classList.toggle("visible", view === "journal");
+    document.getElementById("kb-list").classList.toggle("visible", view === "list");
   }
 
   function escHtml(s) {
@@ -242,7 +463,7 @@
     return d.innerHTML;
   }
 
-  // ── SortableJS ───────────────────────────────────────────────────
+  // ── SortableJS (kanban) ──────────────────────────────────────────
   function initSortable() {
     document.querySelectorAll(".kcol-list").forEach((el) => {
       Sortable.create(el, {
@@ -257,7 +478,6 @@
           const newStatus = newCol.dataset.status;
           const oldStatus = evt.from.closest(".kcol").dataset.status;
           if (newStatus === oldStatus) {
-            // Reorder within same column — persist new order
             const cards = evt.to.querySelectorAll(".card");
             const order = Array.from(cards).map((c) => c.dataset.id);
             await fetch("/api/reorder", {
@@ -265,7 +485,6 @@
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({ status: newStatus, order }),
             });
-            // Sync local stories order so list view stays consistent
             order.forEach((id, idx) => {
               const s = stories.find((x) => x.id === id);
               if (s) s.order = idx;
@@ -274,7 +493,7 @@
             await updateStory(storyId, { status: newStatus });
           }
         },
-        });
+      });
     });
   }
 
@@ -392,9 +611,7 @@
     const notes = r.notes ? `<div class="sr-notes">${escHtml(r.notes)}</div>` : "";
     return `<div class="m-section sr-section">
       <h3>Simplify <span class="sr-status" style="background:${statusColor}20;color:${statusColor};border-color:${statusColor}40">${statusLabel}</span></h3>
-      ${counters}
-      ${agentRows}
-      ${notes}
+      ${counters}${agentRows}${notes}
     </div>`;
   }
 
@@ -407,7 +624,7 @@
       }
       const role = d.role ? `<span class="rd-role">${escHtml(d.role)}</span>` : "";
       const q = d.question ? `<span class="rd-q">${escHtml(d.question)}</span>` : "";
-      const dec = escHtml(d.decision || d.text || "");
+      const dec = escHtml(d.decision || d.answer || d.text || "");
       return `<div class="rd-item">${role}${q}<span class="rd-decision">→ ${dec}</span></div>`;
     }).join("");
     return `<div class="m-section"><h3>Décisions de raffinement</h3><div class="rd-list">${items}</div></div>`;
@@ -415,20 +632,18 @@
 
   function modalContent(s) {
     const acs = (s.acceptance_criteria || [])
-      .map(
-        (ac, i) => `<div class="ac-item">
-          <input type="checkbox" class="ac-check" data-acidx="${i}" ${ac.checked ? "checked" : ""}>
-          <input type="text" class="ac-text" value="${escHtml(ac.text)}" data-acidx="${i}">
-        </div>`
-      )
+      .filter((ac) => ac && typeof ac !== "object" || (typeof ac === "object" && !Array.isArray(ac)))
+      .map((ac, i) => {
+        const text    = typeof ac === "string" ? ac : (ac.text || ac.description || "");
+        const checked = typeof ac === "string" ? false : Boolean(ac.checked);
+        return `<div class="ac-item">
+          <input type="checkbox" class="ac-check" data-acidx="${i}" ${checked ? "checked" : ""}>
+          <input type="text" class="ac-text" value="${escHtml(text)}" data-acidx="${i}">
+        </div>`;
+      })
       .join("");
 
     const statuses = ["pending", "refining", "secops_tm", "tdd", "secops_cr", "qa", "simplify", "commit_ready", "completed", "blocked"];
-    const statusLabels = {
-      pending: "En attente", refining: "Raffinement", secops_tm: "SecOps",
-      tdd: "TDD", secops_cr: "SecOps Rev", qa: "QA", simplify: "Simplify",
-      commit_ready: "Prêt commit", completed: "Terminé", blocked: "Bloqué",
-    };
 
     const currentStack = s.stack || [];
     const stackHtml = STACK_OPTIONS.map((t) => {
@@ -438,7 +653,7 @@
     }).join("");
 
     const tddStatuses = ["pending", "in_progress", "passed", "failed"];
-    const qaStatuses = ["pending", "in_progress", "passed", "failed"];
+    const qaStatuses  = ["pending", "in_progress", "passed", "failed"];
 
     const hasRefine = (s.refine_decisions || []).length > 0 ||
       (s.implementation_guide && Object.keys(s.implementation_guide).length > 0);
@@ -454,7 +669,7 @@
         ${["P0", "P1", "P2", "Future"].map((p) => `<option ${s.priority === p ? "selected" : ""} value="${p}">${p}</option>`).join("")}
       </select></div>
       <div class="m-row"><label>Statut</label><select id="me-status">
-        ${statuses.map((st) => `<option ${colStatus(s) === st ? "selected" : ""} value="${st}">${statusLabels[st] || st}</option>`).join("")}
+        ${statuses.map((st) => `<option ${colStatus(s) === st ? "selected" : ""} value="${st}">${STATUS_LABELS[st] || st}</option>`).join("")}
       </select></div>
     </div>
     <div class="m-section">
@@ -464,7 +679,7 @@
 
     <div class="modal-tabs">
       <button class="tab-btn active" data-tab="spec">Spécification</button>
-      <button class="tab-btn" data-tab="refine">Raffinement${hasRefine ? '<span class="tab-dot"></span>' : ''}</button>
+      <button class="tab-btn" data-tab="refine">Raffinement</button>
       <button class="tab-btn" data-tab="progress">Avancement</button>
       <button class="tab-btn" data-tab="history">Historique</button>
     </div>
@@ -488,9 +703,7 @@
       <div class="m-section">
         <h3>TDD</h3>
         <div class="m-row">
-          <div class="m-inline-3 m-label-row">
-            <label>Statut</label><label>Tests</label><label>Coverage</label>
-          </div>
+          <div class="m-inline-3 m-label-row"><label>Statut</label><label>Tests</label><label>Coverage</label></div>
           <div class="m-inline-3">
             <select id="me-tdd-status">
               ${tddStatuses.map((st) => `<option ${(s.tdd && s.tdd.status) === st ? "selected" : ""} value="${st}">${st}</option>`).join("")}
@@ -504,9 +717,7 @@
       <div class="m-section">
         <h3>QA</h3>
         <div class="m-row">
-          <div class="m-inline m-label-row">
-            <label>Statut</label><label>AC couverts</label>
-          </div>
+          <div class="m-inline m-label-row"><label>Statut</label><label>AC couverts</label></div>
           <div class="m-inline">
             <select id="me-qa-status">
               ${qaStatuses.map((st) => `<option ${(s.qa && s.qa.status) === st ? "selected" : ""} value="${st}">${st}</option>`).join("")}
@@ -517,13 +728,13 @@
         <div class="m-row"><label>Notes QA</label><textarea id="me-qa-notes" rows="1">${escHtml((s.qa && s.qa.notes) || "")}</textarea></div>
       </div>
       <div class="m-section">
-        <h3>SecOps CR — Commentaires</h3>
-        <div class="m-row"><textarea id="me-secops-comments" rows="2" placeholder="Observations, risques, recommandations...">${escHtml((s.secops_report && s.secops_report.comments) || "")}</textarea></div>
+        <h3>SecOps CR</h3>
+        <div class="m-row"><textarea id="me-secops-comments" rows="3" readonly style="color:#94a3b8;cursor:default" placeholder="Auto-rempli par /secops mode=code-review">${escHtml((s.secops_report && (s.secops_report.notes || s.secops_report.note || s.secops_report.comments)) || "")}</textarea></div>
       </div>
       ${simplifyReportSection(s)}
       <div class="m-section">
-        <h3>Simplify — Notes manuelles</h3>
-        <div class="m-row"><textarea id="me-simplify-comments" rows="2" placeholder="Simplifications appliquées, refactoring noté...">${escHtml(s.simplify_comments || "")}</textarea></div>
+        <h3>Simplify — Résumé</h3>
+        <div class="m-row"><textarea id="me-simplify-comments" rows="2" readonly style="color:#94a3b8;cursor:default" placeholder="Auto-rempli par /simplify — RAS si rien à signaler">${escHtml(s.simplify_comments || "")}</textarea></div>
       </div>
     </div>
 
@@ -543,35 +754,31 @@
     const storyId = document.getElementById("me-id").value;
     const acInputs = document.querySelectorAll("#me-acs .ac-item");
     const acs = Array.from(acInputs).map((item) => {
-      const cb = item.querySelector(".ac-check");
+      const cb  = item.querySelector(".ac-check");
       const txt = item.querySelector(".ac-text");
       return { id: parseInt(cb.dataset.acidx) + 1, text: txt.value, checked: cb.checked };
     });
-
     const stack = Array.from(document.querySelectorAll("#me-stack .stack-tag.active")).map((el) => el.dataset.stk);
-
     const data = {
-      title: document.getElementById("me-title").value,
+      title:    document.getElementById("me-title").value,
       priority: document.getElementById("me-prio").value,
-      status: document.getElementById("me-status").value,
+      status:   document.getElementById("me-status").value,
       stack,
       description: document.getElementById("me-desc").value,
       acceptance_criteria: acs,
       notes: document.getElementById("me-notes").value,
       tdd: {
-        status: document.getElementById("me-tdd-status").value,
-        tests: parseInt(document.getElementById("me-tdd-tests").value) || 0,
+        status:   document.getElementById("me-tdd-status").value,
+        tests:    parseInt(document.getElementById("me-tdd-tests").value) || 0,
         coverage: document.getElementById("me-tdd-cov").value,
-        notes: document.getElementById("me-tdd-notes").value,
+        notes:    document.getElementById("me-tdd-notes").value,
       },
       qa: {
-        status: document.getElementById("me-qa-status").value,
+        status:     document.getElementById("me-qa-status").value,
         ac_covered: document.getElementById("me-qa-acs").value,
-        notes: document.getElementById("me-qa-notes").value,
+        notes:      document.getElementById("me-qa-notes").value,
       },
-      secops_report: {
-        comments: document.getElementById("me-secops-comments").value,
-      },
+      secops_report:     { comments: document.getElementById("me-secops-comments").value },
       simplify_comments: document.getElementById("me-simplify-comments").value,
     };
     updateStory(storyId, data);
@@ -606,14 +813,10 @@
     checkOpenCode();
     setInterval(checkOpenCode, 30000);
 
-    // SSE — live refresh when any story changes (drag, MCP, another tab)
+    // SSE — live refresh when any story changes
     const sse = new EventSource("/api/events");
-    sse.onmessage = (e) => {
-      if (e.data === "refresh") loadStories();
-    };
-    sse.onerror = () => {
-      // EventSource auto-reconnects on error
-    };
+    sse.onmessage = (e) => { if (e.data === "refresh") loadStories(); };
+    sse.onerror = () => {};
 
     // Toggle view
     document.querySelector(".toggle-group").addEventListener("click", (e) => {
@@ -621,19 +824,31 @@
       if (!btn) return;
       document.querySelectorAll(".toggle-group button").forEach((b) => b.classList.remove("active"));
       btn.classList.add("active");
+      if (btn.dataset.view === "journal") loadHistory();
       updateView();
     });
 
     // Search
     document.getElementById("kb-search").addEventListener("input", () => {
       renderKanban();
+      renderSimple();
       renderList();
     });
 
-    // Card click → modal (event delegation on kanban)
+    // Card click → modal (kanban + simple views via event delegation)
     document.getElementById("kb-kanban").addEventListener("click", (e) => {
       const card = e.target.closest(".card");
       if (card) openModal(card.dataset.id);
+    });
+    document.getElementById("kb-simple").addEventListener("click", (e) => {
+      const card = e.target.closest(".card");
+      if (card) openModal(card.dataset.id);
+    });
+
+    // Journal: story ID click → modal
+    document.getElementById("kb-journal").addEventListener("click", (e) => {
+      const el = e.target.closest(".jv-story");
+      if (el) openModal(el.dataset.id);
     });
 
     // List row click → modal
@@ -648,21 +863,16 @@
       if (e.target.classList.contains("modal-overlay")) closeModal();
     });
 
-    // Modal save (event delegation because modal content is dynamic)
+    // Modal save
     document.getElementById("modal-body").addEventListener("click", (e) => {
-      const btn = e.target.closest("#me-save");
-      if (btn) saveModal();
+      if (e.target.closest("#me-save")) saveModal();
     });
 
     // Modal delete
     document.getElementById("modal-body").addEventListener("click", (e) => {
-      const btn = e.target.closest("#me-delete");
-      if (btn) {
+      if (e.target.closest("#me-delete")) {
         const storyId = document.getElementById("me-id").value;
-        if (confirm(`Supprimer ${storyId} ?`)) {
-          deleteStory(storyId);
-          closeModal();
-        }
+        if (confirm(`Supprimer ${storyId} ?`)) { deleteStory(storyId); closeModal(); }
       }
     });
 
@@ -675,9 +885,7 @@
     // New story
     document.getElementById("kb-new").addEventListener("click", () => {
       const title = prompt("Titre de la nouvelle US :");
-      if (title && title.trim()) {
-        createStory({ title: title.trim(), priority: "P2", phase: 7 });
-      }
+      if (title && title.trim()) createStory({ title: title.trim(), priority: "P2", phase: 7 });
     });
 
     // List sort
@@ -689,20 +897,16 @@
       document.querySelectorAll(".list-view th").forEach((t) => delete t.dataset.dir);
       th.dataset.dir = asc ? "asc" : "desc";
       stories.sort((a, b) => {
-        let va = a[key] || "";
-        let vb = b[key] || "";
-        if (key === "phase") { va = a.phase || 99; vb = b.phase || 99; }
+        let va = a[key] || "", vb = b[key] || "";
+        if (key === "phase")      { va = a.phase || 99; vb = b.phase || 99; }
         if (key === "tdd_status") { va = (a.tdd && a.tdd.status) || ""; vb = (b.tdd && b.tdd.status) || ""; }
-        if (key === "qa_status") { va = (a.qa && a.qa.status) || ""; vb = (b.qa && b.qa.status) || ""; }
-        if (typeof va === "string") {
-          return asc ? va.localeCompare(vb) : vb.localeCompare(va);
-        }
+        if (key === "qa_status")  { va = (a.qa  && a.qa.status)  || ""; vb = (b.qa  && b.qa.status)  || ""; }
+        if (typeof va === "string") return asc ? va.localeCompare(vb) : vb.localeCompare(va);
         return asc ? va - vb : vb - va;
       });
       renderList();
     });
   });
 
-  // ── Expose for inline handlers ───────────────────────────────────
   window.closeModal = closeModal;
 })();

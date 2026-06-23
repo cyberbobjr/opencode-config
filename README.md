@@ -46,14 +46,31 @@ At its core: a Kanban server that works simultaneously as a **web dashboard**, a
 │   ├── code-simplify-quality.md
 │   └── code-simplify-efficiency.md
 │
-└── kanban/                — Kanban MCP server
-    ├── server.py          — Main server (FastAPI + FastMCP)
+└── kanban/                — Kanban MCP server + Vue dashboard
+    ├── server.py          — Main server (FastAPI + FastMCP, serves dist/)
     ├── requirements.txt
     ├── migrate.py         — Schema migration for existing stories
-    ├── templates/
-    │   └── dashboard.html
-    └── static/
-        └── app.js
+    ├── dist/              — Built Vue app (served by FastAPI at /)
+    │   ├── index.html
+    │   └── assets/        — Hashed JS + CSS bundles
+    └── frontend/          — Vue 3 source (edit here, then npm run build)
+        ├── package.json
+        ├── vite.config.js
+        ├── tailwind.config.js
+        └── src/
+            ├── App.vue
+            ├── api.js
+            ├── constants.js
+            └── components/
+                ├── KanbanBoard.vue
+                ├── SimpleView.vue
+                ├── FocusView.vue
+                ├── JournalView.vue
+                ├── ListView.vue
+                ├── StoryModal.vue
+                ├── KanbanCard.vue
+                ├── StatsBar.vue
+                └── MarkdownContent.vue
 ```
 
 Story data lives **outside** this repo, in `user-stories/*.json` at the project root — one JSON file per story, served by the Kanban server.
@@ -68,7 +85,23 @@ Story data lives **outside** this repo, in `user-stories/*.json` at the project 
 pip install -r .opencode/kanban/requirements.txt
 ```
 
-### 2. Start the Kanban server
+### 2. Build the dashboard (first time only)
+
+The `dist/` folder is committed and ready to use. To rebuild after modifying the Vue frontend:
+
+```bash
+cd .opencode/kanban/frontend
+npm install   # first time only
+npm run build # output → ../dist/
+```
+
+For hot-reload development (proxy to backend at `:8765`):
+
+```bash
+npm run dev   # Vite dev server at http://localhost:5173
+```
+
+### 3. Start the Kanban server
 
 OpenCode automatically starts the server via MCP. You can also run it manually:
 
@@ -84,7 +117,7 @@ Dashboard: `http://localhost:8765`
 
 > **Important**: let OpenCode start the server — it binds both MCP (stdio) and HTTP (port 8765) in the same process. Running a second instance creates two separate processes with desynchronized state.
 
-### 3. Configure OpenCode
+### 4. Configure OpenCode
 
 The `opencode.json` at the root of this repo already wires the Kanban server as an MCP provider:
 
@@ -103,7 +136,7 @@ The `opencode.json` at the root of this repo already wires the Kanban server as 
 
 Copy it to your project root (or merge with your existing `opencode.json`).
 
-### 4. Add your project conventions
+### 5. Add your project conventions
 
 Commands reference `AGENTS.md` at the project root for stack-specific details (test runner, lint commands, file paths, design system). Create one if you don't have it — see the [AGENTS.md template](#agentsmd-template) section below.
 
@@ -176,6 +209,35 @@ Every column move routes through `/next-story` with the matching sub-command:
 
 ---
 
+## Dashboard views
+
+The dashboard at `http://localhost:8765` has five views, toggled from the header:
+
+| View | Key | Description |
+|------|-----|-------------|
+| **Kanban** | `Kanban` | Full 10-column board — one column per pipeline status. Drag cards between columns to trigger the matching command in OpenCode. |
+| **Rapide** | `Rapide` | 5 meta-columns (Backlog / En cours / Validation / Prêt / Terminé). A cross-column drop moves the story to the default target status of the destination group. |
+| **Focus** | `Focus` | Shows the active story (most recently moved, non-pending/done) as a pipeline progress bar with each step highlighted. Useful for monitoring a story currently being processed. |
+| **Journal** | `Journal` | Global activity timeline — all history entries from all stories, grouped by date, in reverse-chronological order. |
+| **Liste** | `Liste` | Sortable table of all stories (ID, title, status, priority, stack). |
+
+Every view shares the same search bar (filters by ID, title, or stack tag) and opens the same edit modal on click.
+
+### Edit modal
+
+The modal has four tabs:
+
+| Tab | Content | Editable? |
+|-----|---------|-----------|
+| **Spécification** | Title, priority, status, stack tags, description, acceptance criteria | ✅ |
+| **Raffinement** | Refinement decisions, implementation guide | Read-only (agent-generated, rendered as Markdown) |
+| **Avancement** | Notes, TDD section (status / tests / coverage / summary), QA section, SecOps report, Simplify summary | Mixed — notes editable, agent reports read-only |
+| **Historique** | Append-only audit trail for this story | Read-only |
+
+Agent-generated fields (TDD notes, SecOps report, Simplify comments, refinement decisions) render as **formatted Markdown** instead of plain text.
+
+---
+
 ## Commands vs Agents
 
 OpenCode distinguishes two concepts:
@@ -238,6 +300,15 @@ The Kanban server exposes 7 tools:
 | `kanban-get-stats` | Get global pipeline counts |
 
 See [`kanban/README.md`](kanban/README.md) for the full schema, merge rules, and debug logging reference.
+
+The server also exposes additional REST endpoints consumed by the dashboard:
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `PATCH` | `/api/stories/{sid}/move` | Move a story to a new status (body: `{ status, actor }`) |
+| `GET` | `/api/history` | Aggregated history across all stories, sorted by timestamp desc |
+| `POST` | `/api/reorder` | Reorder cards within a column (body: `{ status, order: [ids] }`) |
+| `GET` | `/api/events` | SSE stream — sends `data: refresh` on every story change |
 
 ---
 

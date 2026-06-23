@@ -39,6 +39,7 @@ If a story ID was given as argument, call `kanban-update-story` with:
 ```json
 {
   "_actor": "simplify",
+  "simplify_comments": "<1-2 sentences summarising what was simplified or 'RAS' if code was already clean>",
   "simplify_report": {
     "status": "fixed",
     "issues_found": <total>,

@@ -92,6 +92,23 @@ def bump_version():
         _story_version += 1
         return _story_version
 
+
+# ── Story cache ──────────────────────────────────────────────────────
+_story_cache: dict = {"ver": -1, "data": []}
+_cache_lock = threading.Lock()
+
+
+def _load_from_disk() -> list[dict]:
+    out = []
+    for f in sorted(STORIES_DIR.glob("*.json")):
+        try:
+            out.append(json.loads(f.read_text()))
+        except json.JSONDecodeError:
+            log.warning(f"Bad JSON: {f.name}")
+    out.sort(key=lambda s: (s.get("order", 9999), s["id"]))
+    return out
+
+
 # ── OpenCode HTTP Bridge ─────────────────────────────────────────────
 OPENCODE_SERVER_URL = os.environ.get("OPENCODE_SERVER_URL", "http://localhost:4096")
 OPENCODE_TRIGGER_ENABLED = os.environ.get("OPENCODE_TRIGGER_ENABLED", "1") == "1"
@@ -173,24 +190,20 @@ STORIES_DIR = find_stories_dir()
 
 
 def load_all() -> list[dict]:
-    out = []
-    for f in sorted(STORIES_DIR.glob("*.json")):
-        try:
-            out.append(json.loads(f.read_text()))
-        except json.JSONDecodeError:
-            log.warning(f"Bad JSON: {f.name}")
-    out.sort(key=lambda s: (s.get("order", 9999), s["id"]))
-    return out
+    with _cache_lock:
+        if _story_cache["ver"] == _story_version and _story_cache["data"]:
+            return copy.deepcopy(_story_cache["data"])
+    data = _load_from_disk()
+    with _cache_lock:
+        _story_cache["ver"] = _story_version
+        _story_cache["data"] = data
+    return copy.deepcopy(data)
 
 
 def load_one(story_id: str) -> dict | None:
-    for f in STORIES_DIR.glob("*.json"):
-        try:
-            d = json.loads(f.read_text())
-            if d["id"] == story_id:
-                return d
-        except json.JSONDecodeError:
-            pass
+    for s in load_all():
+        if s.get("id") == story_id:
+            return s
     return None
 
 
@@ -391,6 +404,49 @@ def api_create(body: dict):
     return story
 
 
+@rest.patch("/api/stories/{sid}/move")
+def api_move_story(sid: str, body: dict, no_trigger: bool = False):
+    """Move a story to a new status. Body: {status, actor?}. Triggers OpenCode if applicable."""
+    new_status = body.get("status")
+    actor = body.get("actor", "dashboard")
+    valid = set(FLOW_STATUSES)
+    if not new_status or new_status not in valid:
+        raise HTTPException(400, f"Invalid status. Valid: {', '.join(sorted(valid))}")
+    s = load_one(sid)
+    if not s:
+        raise HTTPException(404, f"Story {sid} not found")
+    old_status = s.get("status")
+    s["status"] = new_status
+    if old_status != new_status:
+        s.setdefault("history", []).append({
+            "ts": datetime.now().isoformat(timespec="seconds"),
+            "by": actor,
+            "changes": [f"status: {old_status} → {new_status}"],
+        })
+    save_one(sid, s)
+    if not no_trigger and new_status != old_status and new_status in STATUS_COMMANDS:
+        cmd_name, cmd_args = STATUS_COMMANDS[new_status](sid)
+        cmd_str = f"/{cmd_name} {cmd_args}"
+        trigger_result = trigger_opencode(sid, command=cmd_str)
+        return {**s, "_trigger": trigger_result}
+    return s
+
+
+@rest.post("/api/stories/{sid}/trigger")
+def api_trigger(sid: str):
+    """Fire the OpenCode command for the story's current status, without moving it."""
+    s = load_one(sid)
+    if not s:
+        raise HTTPException(404, f"Story {sid} not found")
+    status = s.get("status")
+    if status not in STATUS_COMMANDS:
+        raise HTTPException(400, f"No command defined for status '{status}'")
+    cmd_name, cmd_args = STATUS_COMMANDS[status](sid)
+    cmd_str = f"/{cmd_name} {cmd_args}"
+    result = trigger_opencode(sid, command=cmd_str)
+    return {"ok": True, "command": cmd_str, "trigger": result}
+
+
 @rest.delete("/api/stories/{sid}")
 def api_delete(sid: str):
     if not delete_one(sid):
@@ -401,6 +457,24 @@ def api_delete(sid: str):
 @rest.get("/api/stats")
 def api_stats():
     return stats(load_all())
+
+
+@rest.get("/api/history")
+def api_history(limit: int = 100):
+    """Return the last `limit` history events across all stories, newest first."""
+    events: list[dict] = []
+    for s in load_all():
+        for entry in s.get("history", []):
+            events.append({
+                "story_id": s["id"],
+                "story_title": s.get("title", ""),
+                "story_status": s.get("status", "pending"),
+                "ts": entry.get("ts", ""),
+                "by": entry.get("by", ""),
+                "changes": entry.get("changes", []),
+            })
+    events.sort(key=lambda e: e.get("ts", ""), reverse=True)
+    return events[:limit]
 
 
 @rest.get("/api/debug")
@@ -457,15 +531,12 @@ async def api_events():
 
 @rest.get("/")
 def dashboard():
-    html = (HERE / "templates" / "dashboard.html").read_text(encoding="utf-8")
-    js_mtime = int((HERE / "static" / "app.js").stat().st_mtime)
-    html = html.replace('src="/static/app.js"', f'src="/static/app.js?v={js_mtime}"')
-    return HTMLResponse(html)
+    return HTMLResponse((HERE / "dist" / "index.html").read_text(encoding="utf-8"))
 
 
-static_dir = HERE / "static"
-if static_dir.is_dir():
-    rest.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
+dist_assets = HERE / "dist" / "assets"
+if dist_assets.is_dir():
+    rest.mount("/assets", StaticFiles(directory=str(dist_assets)), name="assets")
 
 
 # ── MCP Tools ──────────────────────────────────────────────────────

@@ -45,12 +45,15 @@ Environment variables:
 
 ```
 server.py
-├── Storage           → user-stories/*.json  (one file per story)
+├── Storage           → user-stories/*.json  (one file per story, in-memory cache)
 ├── REST API          → FastAPI  :8765
-├── Dashboard         → templates/dashboard.html + static/app.js
+├── Dashboard         → GET / serves dist/index.html  (Vue 3 + Tailwind)
+│                        GET /assets/* serves dist/assets/*  (hashed bundles)
 ├── MCP tools         → FastMCP "kanban-stories"
 └── OpenCode bridge   → POST /tui/clear-prompt → append-prompt → submit-prompt
 ```
+
+The server maintains a **version-based in-memory cache** of all stories. Each write (`save_one`) increments `_story_version`; reads check the counter and reload from disk only when stale. This eliminates redundant file I/O during SSE-driven dashboard refresh cycles.
 
 ### Flow when a card is dragged in the dashboard
 
@@ -256,18 +259,20 @@ Returns global project statistics.
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| `GET` | `/` | Dashboard HTML |
+| `GET` | `/` | Dashboard (serves `dist/index.html`) |
 | `GET` | `/api/stories` | List (filters `?status=` `?phase=`) |
 | `GET` | `/api/stories/{sid}` | Single story |
-| `PUT` | `/api/stories/{sid}` | Update + OpenCode trigger |
+| `PATCH` | `/api/stories/{sid}` | Partial update + OpenCode trigger |
+| `PATCH` | `/api/stories/{sid}/move` | Move story to new status — body `{ status, actor }` |
 | `POST` | `/api/stories` | Create |
 | `DELETE` | `/api/stories/{sid}` | Delete |
-| `POST` | `/api/reorder` | Reorder cards within a column |
+| `POST` | `/api/reorder` | Reorder cards within a column — body `{ status, order: [ids] }` |
+| `GET` | `/api/history` | Aggregated history from all stories, sorted by `ts` desc |
 | `GET` | `/api/events` | SSE — sends `data: refresh` on every change |
 | `GET` | `/api/stats` | Global statistics |
 | `GET` | `/api/debug` | Last 50 trigger events (diagnostics) |
 
-The `?no_trigger=1` parameter on `PUT` disables the OpenCode bridge for that call.
+The `?no_trigger=1` parameter on `PATCH` disables the OpenCode bridge for that call.
 
 ---
 
@@ -391,12 +396,46 @@ KANBAN_DEBUG=1 python .opencode/kanban/server.py --mcp 2>mcp-debug.log
 
 ```
 .opencode/kanban/
-├── server.py          — main server (this file)
-├── requirements.txt   — Python dependencies
-├── migrate.py         — schema migration tool for existing stories
-├── kanban.log         — runtime logs + MCP debug events  [gitignored]
-├── templates/
-│   └── dashboard.html — web interface (inline CSS)
-└── static/
-    └── app.js         — client logic (SortableJS, SSE, modal)
+├── server.py            — main server (FastAPI + FastMCP, serves dist/)
+├── requirements.txt     — Python dependencies (fastapi, uvicorn, mcp)
+├── migrate.py           — schema migration tool for existing stories
+├── kanban.log           — runtime logs + MCP debug events  [gitignored]
+│
+├── dist/                — built Vue app (committed, served by FastAPI)
+│   ├── index.html
+│   └── assets/          — hashed JS + CSS bundles (Vite output)
+│
+└── frontend/            — Vue 3 source (Vite + Tailwind + vuedraggable)
+    ├── package.json
+    ├── vite.config.js   — build output: ../dist/
+    ├── tailwind.config.js
+    ├── postcss.config.js
+    ├── index.html
+    └── src/
+        ├── main.js
+        ├── style.css        — Tailwind directives + markdown prose styles
+        ├── constants.js     — STATUS_LABELS/COLORS, KANBAN_COLUMNS, SIMPLE_GROUPS…
+        ├── api.js           — fetch wrappers for all REST endpoints
+        ├── App.vue          — root — state, SSE, view switching, toasts
+        └── components/
+            ├── KanbanBoard.vue    — 10-column drag-and-drop (vuedraggable)
+            ├── SimpleView.vue     — 5 meta-column view (vuedraggable)
+            ├── FocusView.vue      — active story pipeline progress
+            ├── JournalView.vue    — global activity timeline
+            ├── ListView.vue       — sortable table
+            ├── StoryModal.vue     — 4-tab edit modal (Spec/Raffinement/Avancement/Historique)
+            ├── KanbanCard.vue     — story card with status/priority/stack badges
+            ├── StatsBar.vue       — per-status story counts
+            └── MarkdownContent.vue — sanitized markdown renderer (marked + DOMPurify)
 ```
+
+### Rebuilding the frontend
+
+```bash
+cd .opencode/kanban/frontend
+npm install          # first time only
+npm run build        # output → ../dist/ (replaces existing build)
+npm run dev          # Vite dev server :5173 with proxy to :8765
+```
+
+The `dist/` folder is committed so the dashboard works without an npm install step.
