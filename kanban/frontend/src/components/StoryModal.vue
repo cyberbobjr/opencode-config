@@ -66,6 +66,10 @@ const secopsNotes = computed(() =>
   props.story.secops_report?.comments || ''
 )
 const simplifyComments = computed(() => props.story.simplify_comments || '')
+const simplifyDone = computed(() =>
+  !simplifyComments.value &&
+  (props.story.history || []).some(e => e.by === 'simplify')
+)
 const tddNotes         = computed(() => props.story.tdd?.notes || '')
 const storyHistory     = computed(() => [...(props.story.history || [])].reverse())
 
@@ -365,10 +369,11 @@ function confirmDelete() {
           </div>
 
           <!-- Simplify (read-only) -->
-          <div v-if="simplifyComments">
+          <div v-if="simplifyComments || simplifyDone">
             <label class="label">Simplify — Résumé</label>
             <div class="bg-slate-800/60 rounded-lg p-4 border border-slate-700">
-              <MarkdownContent :content="simplifyComments" />
+              <MarkdownContent v-if="simplifyComments" :content="simplifyComments" />
+              <p v-else class="text-sm text-slate-500 italic">Stage complété — aucun commentaire enregistré.</p>
             </div>
           </div>
 

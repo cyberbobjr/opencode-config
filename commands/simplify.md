@@ -32,9 +32,11 @@ When done, compile the results:
 - `issues_fixed`: number of issues actually fixed (false positives excluded)
 - Per-agent summary (one sentence each): what was found / confirmed clean
 
-## Phase 4: Persist Report to Story (if story ID provided)
+## Phase 4: Persist Report to Story (MANDATORY if story ID provided)
 
-If a story ID was given as argument, call `kanban-update-story` with:
+**This phase is required whenever a story ID was passed as argument — including when called via the `/next-story` orchestrator.** Never skip to Phase 5 without writing the report first.
+
+Call `kanban-update-story` with:
 
 ```json
 {
