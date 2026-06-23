@@ -374,10 +374,10 @@ def api_create(body: dict):
     phase_names = {1: "Fondations Backend", 2: "Frontend MVP", 3: "SaaS & Monétisation",
                    4: "Mode Entreprise", 5: "Quality & Hardening", 6: "V2 & Futur", 7: "Backlog"}
     now = str(date.today())
-    next_order = max((s.get("order", 0) for s in existing if s.get("status") == "refining"), default=-1) + 1
+    next_order = max((s.get("order", 0) for s in existing if s.get("status") == "pending"), default=-1) + 1
     story = {
         "id": sid, "phase": phase, "phase_name": phase_names.get(phase, "Backlog"),
-        "title": title, "description": "", "priority": priority, "status": "refining",
+        "title": title, "description": "", "priority": priority, "status": "pending",
         "order": next_order,
         "acceptance_criteria": [],
         "stack": [],
@@ -590,10 +590,10 @@ def create_story(title: str, priority: str = "P2", phase: int = 7) -> str:
     phase_names = {1: "Fondations Backend", 2: "Frontend MVP", 3: "SaaS & Monétisation",
                    4: "Mode Entreprise", 5: "Quality & Hardening", 6: "V2 & Futur", 7: "Backlog"}
     now = str(date.today())
-    next_order = max((s.get("order", 0) for s in existing if s.get("status") == "refining"), default=-1) + 1
+    next_order = max((s.get("order", 0) for s in existing if s.get("status") == "pending"), default=-1) + 1
     story = {
         "id": sid, "phase": phase, "phase_name": phase_names.get(phase, "Backlog"),
-        "title": title, "description": "", "priority": priority, "status": "refining",
+        "title": title, "description": "", "priority": priority, "status": "pending",
         "order": next_order,
         "acceptance_criteria": [],
         "stack": [],

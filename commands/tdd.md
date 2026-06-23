@@ -1,167 +1,53 @@
 ---
-description: TDD Agent — implements a user story with Test-Driven Development (red → green → refactor)
+description: TDD Command — fetches story context and launches the tdd subagent via Task tool
 argument:
   required: true
   description: "Story ID (e.g. 'US 1.3')"
 ---
 
-# TDD Agent — `/tdd $ARGUMENTS`
+# TDD Command — `/tdd $ARGUMENTS`
 
-**Story ID:** `$ARGUMENTS`
+Thin orchestrator wrapper that assembles context and delegates implementation to the isolated `tdd` subagent.
 
-Implements story `$ARGUMENTS` with the **Red → Green → Refactor** cycle.
+## Phase 1: Gather Context
 
-## Input Protocol
+1. Call `kanban-get-story("$ARGUMENTS")` to retrieve the full story (ACs, implementation_guide, description, stack)
+2. Read `AGENTS.md` — extract the relevant sections: test run commands, stack info, quality gate commands, design system reference
 
-The orchestrator agent (or the user) must provide the following as input:
+## Phase 2: Launch TDD Subagent
 
-| Info | Source | Description |
-|------|--------|-------------|
-| `story_id` | `$ARGUMENTS` | e.g. "US 1.3" |
-| `mode` | Orchestrator | `full-cycle` (default) or `fix-failing-acs` (when QA failed) |
-| `ac` | MCP `kanban-get-story` | Acceptance criteria from `user-stories/*.json` |
-| `implementation_guide` | MCP `kanban-get-story` | **Technical plan from refinement** — files, schema, API contracts, sequence (field `implementation_guide`) |
-| `context` | Project | stack conventions from `AGENTS.md` |
-| `design_system` (if frontend) | Design system reference (see `AGENTS.md`) | CSS tokens, palette, typography |
-| `ac_failing` (if mode=fix) | QA report | List of failed ACs with diagnosis: `ac_id`, `title`, `test_failing`, `error`, `file`, `line` |
+Use the **Task tool** to launch the `tdd` subagent with `subagent_type: "tdd"`.
 
-## Output Protocol
+Inject the following as the Task prompt (replace placeholders with actual values):
 
-At the end, produce this structured report to the orchestrator agent:
+```
+story_id: $ARGUMENTS
+mode: full-cycle
+is_orchestrated: false
 
-```markdown
-# TDD Report — US X.Y
-**status**: passed | failed
-**tests**: N created, N passed, N failed
-**coverage**: XX%
-**files**: list of modified/created files
-**notes**: blockers, remarks, uncovered edge cases
+STORY JSON:
+[paste the full JSON returned by kanban-get-story]
+
+AGENTS.MD CONVENTIONS:
+[paste the relevant AGENTS.md sections: test commands, stack, quality gate commands, design system if frontend]
+
+Instructions:
+- Run the full Red-Green-Refactor cycle for this story
+- Update the story status via MCP tools (kanban-update-story) as you progress
+- At the end, return the structured TDD report
 ```
 
-You must also update the story via the Kanban server MCP tools:
+> **Note:** If this command is called from `/next-story` with the explicit annotation "Orchestrator context", set `is_orchestrated: true` in the prompt so the subagent does not ask about advancing.
 
-```bash
-# At the start of implementation:
-# Call: kanban-update-story("US X.Y", '{"tdd": {"status": "in_progress"}}')
+## Phase 3: Display Result
 
-# At the end of implementation (success):
-# Call: kanban-update-story("US X.Y", '{"tdd": {"status": "passed", "tests": 10, "coverage": "92%", "notes": "All unit tests pass"}}')
+Display the TDD report returned by the subagent.
 
-# At the end of implementation (failure):
-# Call: kanban-update-story("US X.Y", '{"tdd": {"status": "failed", "tests": 5, "coverage": "40%", "notes": "Database connection not mocking correctly"}}')
-```
+## Phase 4: Advance
 
-> MCP tools are available once the Kanban server is running (`python .opencode/kanban/server.py`). Use `kanban-get-story` to read the ACs and `kanban-update-story` to persist TDD results.
-
-## Internal Workflow
-
-### 0. Mode selection
-
-**If `mode = fix-failing-acs`** (corrective mode after QA failure):
-
-1. Mark `tdd.status = in_progress` via `kanban-update-story("US X.Y", '{"_actor": "tdd", "tdd": {"status": "in_progress"}}')`
-2. Read the `ac_failing` list provided by the orchestrator (failed ACs + diagnosis)
-3. Ignore already-green ACs — only work on these
-4. Go directly to step **2. RED** with the failed ACs only
-5. **Absolute rule**: do NOT modify code for already-validated ACs
-
-**If `mode = full-cycle`** (default, first implementation):
-
-Continue normally to step 1 below.
-
----
-
-### 1. Initialization
-
-1. Mark `tdd.status = in_progress` via `kanban-update-story("$ARGUMENTS", '{"_actor": "tdd", "tdd": {"status": "in_progress"}}')`
-2. Read the full story via `kanban-get-story("$ARGUMENTS")` — retrieve ACs, `implementation_guide`, description
-3. Read `AGENTS.md` for project conventions
-4. **Determine the work type** from `implementation_guide.type` (or infer from ACs if absent):
-   - `backend` | `frontend` | `fullstack` | `database` | `devops` | `infrastructure` | `architecture` | `bugfix` | `security` | `docs`
-5. **If `implementation_guide` is present and non-empty** — use it as a blueprint:
-   - `steps` → implementation sequence to follow
-   - `files_create` / `files_modify` / `files_delete` → exact scope
-   - `test_strategy` → type of tests to write
-   - `constraints` → rules not to break
-   - Type-specific sections (`data_model`, `api_contracts`, `devops_changes`…)
-6. **If `implementation_guide` is absent** — explore the existing code to infer the approach
-7. **If type includes `frontend`** — read the design system reference defined in `AGENTS.md`
-8. Announce the plan: list the files you will create/modify before starting
-
-### 2. RED — Write the failing tests
-
-Adapt the test type to the story domain:
-
-| Story type | Test type | Tool |
-|------------|-----------|------|
-| `backend` — business logic | Unit | stack test tool (see `AGENTS.md`) |
-| `backend` — API endpoint | Integration | stack test tool + HTTP test client |
-| `backend` — background worker | Integration | stack test tool + broker mock |
-| `frontend` — component | Component | frontend test tool (see `AGENTS.md`) |
-| `frontend` — page / flow | E2E | E2E test tool (see `AGENTS.md`) |
-| `database` — migration | DB integration | stack test tool + test DB |
-| `devops` / `infrastructure` | Smoke test | bash script or stack test tool |
-| `architecture` — refactoring | Existing tests (must not break) | per stack |
-| `bugfix` | Regression test | per stack |
-| `security` | Abuse / penetration test | per stack |
-| `docs` | No RED/GREEN test | manual verification |
-
-General rules:
-- Write the test **before** the production code — it must fail (`red`)
-- One test per scenario (nominal + edge cases)
-- Naming: `test_<feature>_<scenario>` (e.g. `test_auth_register_success`)
-- Mock external dependencies (message brokers, graph databases, SMTP, payment services, third-party APIs)
-- **In fix mode**: read the QA error (file, line, message) to guide the correction
-
-### 3. GREEN — Implement the minimum code
-
-Write just enough to make the tests pass:
-- Do not over-engineer (YAGNI) — implement exactly what the test requires
-- Follow project conventions (naming, structure, patterns from `AGENTS.md`)
-- Follow the `implementation_guide.steps` sequence if available
-
-### 4. REFACTOR — Clean up without breaking
-
-Once tests are green:
-- Refactor if needed — remove duplication, improve readability
-- Do not change observable behavior — tests must still pass
-- For `architecture` / `refactoring`: this is the main step — verify that zero existing tests regress
-
-### 5. Quality Gates
-
-Run **only the relevant checks** for the story type. Refer to `AGENTS.md` for the project-specific commands.
-
-General categories to cover:
-
-- **Backend** — lint, type check, unit + integration tests
-- **Frontend** — lint, type check, component tests, E2E
-- **DevOps / Infrastructure** — validate config syntax, verify images build
-- **Database (migration)** — check migration consistency, apply on test DB, verify rollback
-- **Docs** — verify links are not broken, code examples compile
-
-For `bugfix` and `security`: run the gates for the impacted stack.
-
-Fix all issues before moving to the next step.
-
-### 6. Report
-
-1. Mark `tdd.status = passed` (or `failed`) via:
-   ```bash
-   kanban-update-story("$ARGUMENTS", '{"_actor": "tdd", "tdd": {"status": "passed", "tests": 10, "coverage": "92%", "notes": "All tests pass"}}')
-   ```
-2. **Advance to security code review:**
-   - If `failed` → stop and display the failure report (user decides what to do next)
-   - If `passed` and **called via `/next-story` orchestrator** (the calling context explicitly says "Orchestrator context") → return the report and stop. The orchestrator handles the move to `secops_cr`.
-   - If `passed` and **called standalone** → ask:
-     > "✅ TDD passed — [N] tests, [coverage]. Proceed to security code review (`secops_cr`)? [yes / no]"
-     - **yes** → `kanban-move-story("$ARGUMENTS", "secops_cr", "tdd")` → run `/secops "$ARGUMENTS" mode=code-review`
-     - **no** → stop. "To continue later: drag to `secops_cr` or run `/next-story secops-cr $ARGUMENTS`"
-3. Return the structured report to the orchestrator agent
-
-## Reminders
-
-- ❌ Never modify `user-stories/*.json` files directly — use the MCP tools (`kanban-update-story`)
-- ❌ Do not add code comments unless necessary
-- ✅ Follow project conventions (AGENTS.md)
-- ✅ For frontend, strictly follow the design system
-- ✅ If blocked, return `status: failed` with notes explaining the blocker
+- If `status: failed` in the report → stop, display the failure details
+- If `status: passed` and this was called via `/next-story` orchestrator (context says "Orchestrator context") → return the report only. The orchestrator handles `kanban-move-story` to `secops_cr`.
+- If `status: passed` and called standalone → ask:
+  > "✅ TDD passed — [N] tests, [coverage]. Proceed to security code review (`secops_cr`)? [yes / no]"
+  - **yes** → `kanban-move-story("$ARGUMENTS", "secops_cr", "tdd")` → run `/secops "$ARGUMENTS" mode=code-review`
+  - **no** → stop. "To continue later: drag to `secops_cr` or run `/next-story secops-cr $ARGUMENTS`"

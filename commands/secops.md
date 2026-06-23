@@ -125,119 +125,49 @@ kanban-update-story("[story_id]", '{"_actor": "secops-tm", "secops_report": {"mo
 
 ## Mode: code-review
 
-Audits the modified code against an automated security checklist.
+Thin wrapper that assembles context and delegates the audit to the isolated `secops-cr` subagent.
 
-### 1. Initialization
+### Phase 1: Gather Context
 
-1. Run `git diff HEAD --name-only` to identify modified files
-2. If no diff → skip, return `status: skipped`
-3. Identify the impacted stack: backend, frontend, database (see `AGENTS.md` for project tech stack)
+1. Run `git diff HEAD` and capture the full output
+2. Call `kanban-get-story("[story_id]")` to retrieve the full story (stack, implementation_guide)
+3. Read `AGENTS.md` — extract: stack info, backend/frontend paths, dependency audit command
 
-### 2. Per-file analysis
+### Phase 2: Launch SecOps-CR Subagent
 
-For each modified file, run the relevant checks via `rg`, `grep`, and manual inspection.
+Use the **Task tool** to launch the `secops-cr` subagent with `subagent_type: "secops-cr"`.
 
-#### Backend
+Inject the following as the Task prompt (replace placeholders with actual values):
 
-- [ ] **Secrets** — no hardcoded secret (API key, password, token, secret)
-- [ ] **Input validation** — all user parameters go through schema validation (ORM/validator)
-- [ ] **SQL injection** — no string concatenation in queries (parameterized ORM/driver)
-- [ ] **Auth** — new endpoints carry the auth middleware (except login/register/webhook)
-- [ ] **CSRF** — mutations (POST/PUT/DELETE) are protected
-- [ ] **CORS** — no wildcard `*` in production
-- [ ] **Error handling** — no stack trace returned to the client
-- [ ] **Rate limiting** — new public endpoints are covered
-- [ ] **Graph/NoSQL** — no injection (parameterized queries via driver)
+```
+story_id: [story_id]
+is_orchestrated: false
 
-#### Frontend
+STORY JSON:
+[paste the full JSON returned by kanban-get-story]
 
-- [ ] **Secrets** — no token/secret in the frontend bundle (env variables only, see `AGENTS.md`)
-- [ ] **XSS** — no unsanitized raw HTML binding, no dangerous interpolation
-- [ ] **Token storage** — no localStorage storage (httpOnly cookie only)
-- [ ] **Input validation** — client-side validation before submission (complementary to backend)
+GIT DIFF:
+[paste the full output of git diff HEAD]
 
-#### Dependencies
+AGENTS.MD CONVENTIONS:
+[paste the relevant AGENTS.md sections: stack, backend/frontend paths, dependency audit command]
 
-- [ ] **Dependency audit** — no new HIGH/CRITICAL vulnerability (see `AGENTS.md` for the audit command per stack)
-
-### 3. Automated checks (to run)
-
-```bash
-# 3.1 Secrets in the diff (critical patterns — generic, adapt patterns as needed)
-git diff HEAD -- ':(exclude)*.env.example' ':(exclude).env' ':(exclude)*.md' | \
-  grep -inP '(api[_-]?key|secret|password|token|private[_-]?key)\s*[:=]\s*['"'"'"](sk-|eyJ|AKIA|gh[ps]_|xox[bpar]|ghp_)' && \
-  echo "⚠️  SECRETS DETECTED IN DIFF" || true
-
-# 3.2 Check auth middleware on new route endpoints
-# Adapt paths and decorator/middleware name to your project (see AGENTS.md)
-# Example pattern:
-# changed_routes=$(git diff HEAD --name-only -- '<backend>/routes*' '<backend>/api*')
-# Check new endpoints lack the authentication decorator/middleware
-
-# 3.3 Dependency audit if package manifest modified
-# Adapt command to your stack (see AGENTS.md): npm audit, pip audit, cargo audit, etc.
-# Example: git diff HEAD --name-only | grep -q 'package.json' && npm audit --audit-level=high || true
-
-# 3.4 Unsanitized raw HTML binding in frontend
-# Adapt pattern to your framework (see AGENTS.md)
-# Vue: grep for v-html; React: grep for dangerouslySetInnerHTML; Angular: grep for [innerHTML]
-git diff HEAD -- '*.ts' '*.vue' '*.js' '*.tsx' '*.jsx' | grep '^+' | \
-  grep -P 'v-html|dangerouslySetInnerHTML|\[innerHTML\]' && \
-  echo "⚠️  Raw HTML binding detected — verify content is sanitized" || true
-
-# 3.5 Token storage in localStorage/sessionStorage
-git diff HEAD -- '*.ts' '*.vue' '*.js' '*.tsx' '*.jsx' | grep '^+' | \
-  grep -P 'localStorage|sessionStorage' | grep -iP 'token|session|auth' && \
-  echo "⚠️  Token storage in localStorage detected" || true
+Instructions:
+- Audit the modified code against the OWASP checklist
+- Update the story secops_report via MCP tools (kanban-update-story)
+- At the end, return the structured SecOps CR report
 ```
 
-### 4. Report
+> **Note:** If this command is called from `/next-story` with the explicit annotation "Orchestrator context", set `is_orchestrated: true` in the prompt so the subagent does not ask about advancing.
 
-```markdown
-# SecOps Report — US X.Y
-**mode**: code-review
-**status**: passed | failed | skipped
-**files_audited**: [N files]
+### Phase 3: Display Result
 
-**Backend**:
-  ✅ Secrets — none hardcoded
-  ✅ Input validation — schema validation present
-  ⚠️ Auth — endpoint POST /api/admin/import_csv without auth middleware
-  ...
+Display the SecOps CR report returned by the subagent.
 
-**Frontend**:
-  ✅ XSS — no dangerous raw HTML binding
-  ...
+### Phase 4: Advance
 
-**Dependencies**:
-  ✅ Dependency audit — clean
-  ...
-
-**issues**: [ONLY if status=failed]
-  - CRITICAL: endpoint POST /api/admin/import_csv without auth middleware
-    → file: <backend>/routes/admin.<ext>:25
-    → risk: unauthenticated execution
-    → fix: add authentication and admin role middleware
-  - ...
-
-**notes**: [observations, false positives, non-blocking alerts]
-```
-
-### 5. Persistence and auto-advance
-
-Persist the results in the story via MCP:
-```python
-kanban-update-story("[story_id]", '{"_actor": "secops-cr", "secops_report": {"mode": "code-review", "status": "passed|failed|skipped", "files_audited": 5, "issues": [...], "notes": "..."}}')
-```
-
-Statuses:
-- `passed` — no security issues
-- `failed` — at least one critical issue (must be fixed before QA)
-- `skipped` — no code to audit (documentation story, config, CI)
-
-**Advance to QA:**
-- If `failed` → stop and display the issues (user fixes before continuing)
-- If `passed` or `skipped` and **called via `/next-story` orchestrator** (the calling context explicitly says "Orchestrator context") → return the report and stop. The orchestrator handles the move to `qa`.
+- If `status: failed` → stop and display the issues (user fixes before continuing)
+- If `passed` or `skipped` and **called via `/next-story` orchestrator** (the calling context explicitly says "Orchestrator context") → return the report. The orchestrator handles the move to `qa`.
 - If `passed` or `skipped` and **called standalone** → ask:
   > "✅ SecOps code review — [passed/skipped]. Proceed to QA validation? [yes / no]"
   - **yes** → `kanban-move-story("[story_id]", "qa", "secops-cr")` → run `/qa [story_id]`
