@@ -94,8 +94,17 @@ def bump_version():
 
 
 # ── Story cache ──────────────────────────────────────────────────────
-_story_cache: dict = {"ver": -1, "data": []}
+_story_cache: dict = {"ver": -1, "mtime": 0.0, "data": []}
 _cache_lock = threading.Lock()
+
+
+
+def _disk_mtime() -> float:
+    """Return the max mtime of all JSON files in STORIES_DIR."""
+    files = list(STORIES_DIR.glob("*.json"))
+    if not files:
+        return 0.0
+    return max(fj.stat().st_mtime for fj in files)
 
 
 def _load_from_disk() -> list[dict]:
@@ -190,12 +199,18 @@ STORIES_DIR = find_stories_dir()
 
 
 def load_all() -> list[dict]:
+    current_mtime = _disk_mtime()
     with _cache_lock:
-        if _story_cache["ver"] == _story_version and _story_cache["data"]:
+        if (
+            _story_cache["ver"] == _story_version
+            and _story_cache["mtime"] == current_mtime
+            and _story_cache["data"]
+        ):
             return copy.deepcopy(_story_cache["data"])
     data = _load_from_disk()
     with _cache_lock:
         _story_cache["ver"] = _story_version
+        _story_cache["mtime"] = current_mtime
         _story_cache["data"] = data
     return copy.deepcopy(data)
 
@@ -430,6 +445,14 @@ def api_move_story(sid: str, body: dict, no_trigger: bool = False):
         trigger_result = trigger_opencode(sid, command=cmd_str)
         return {**s, "_trigger": trigger_result}
     return s
+
+
+@rest.post("/api/reload")
+def api_reload():
+    """Force cache invalidation — picks up files written directly to disk."""
+    bump_version()
+    stories = load_all()
+    return {"reloaded": True, "count": len(stories)}
 
 
 @rest.post("/api/stories/{sid}/trigger")
