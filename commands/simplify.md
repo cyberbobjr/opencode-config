@@ -55,11 +55,11 @@ If a story ID was given as argument, call `kanban-update-story` with:
 
 Use `"status": "passed"` when no issues were found, `"status": "fixed"` when issues were found and fixed, `"status": "skipped"` if there were no relevant files to review.
 
-## Pipeline — Next Steps
+## Phase 5: Advance to Commit
 
-After Simplify passes, the orchestrator **must** continue with:
-
-1. **Move story to `commit_ready`** — `kanban-move-story("$ARGUMENTS", "commit_ready", "simplify")`
-2. **Commit** — propose a conventional commit message, stage, and commit
-
-> ⚠️ Do NOT commit before Simplify completes. Simplify is the last quality gate before commit.
+After the report is written:
+- **Called via `/next-story` orchestrator** (the calling context explicitly says "Orchestrator context") → call `kanban-move-story("$ARGUMENTS", "commit_ready", "simplify")` and return the report. The orchestrator handles the commit confirmation.
+- **Called standalone** → ask:
+  > "✅ Simplify complete — [N] issues found, [N] fixed. Move to `commit_ready` and commit? [yes / no]"
+  - **yes** → `kanban-move-story("$ARGUMENTS", "commit_ready", "simplify")` → propose a conventional commit message → stage and commit
+  - **no** → stop. "To commit later: drag to `commit_ready` or run `/next-story commit $ARGUMENTS`"

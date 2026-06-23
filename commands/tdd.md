@@ -149,20 +149,14 @@ Fix all issues before moving to the next step.
    ```bash
    kanban-update-story("$ARGUMENTS", '{"_actor": "tdd", "tdd": {"status": "passed", "tests": 10, "coverage": "92%", "notes": "All tests pass"}}')
    ```
-2. **Pipeline auto-advance:**
-   - If `passed` → `kanban-move-story("$ARGUMENTS", "secops_cr", "tdd")` — automatic move to security review
+2. **Advance to security code review:**
    - If `failed` → stop and display the failure report (user decides what to do next)
+   - If `passed` and **called via `/next-story` orchestrator** (the calling context explicitly says "Orchestrator context") → return the report and stop. The orchestrator handles the move to `secops_cr`.
+   - If `passed` and **called standalone** → ask:
+     > "✅ TDD passed — [N] tests, [coverage]. Proceed to security code review (`secops_cr`)? [yes / no]"
+     - **yes** → `kanban-move-story("$ARGUMENTS", "secops_cr", "tdd")` → run `/secops "$ARGUMENTS" mode=code-review`
+     - **no** → stop. "To continue later: drag to `secops_cr` or run `/next-story secops-cr $ARGUMENTS`"
 3. Return the structured report to the orchestrator agent
-
-## Pipeline — Next Steps
-
-After TDD (and the SecOps code review), the orchestrator **must** continue with:
-
-1. **QA** (`/qa US X.Y`) — validates each AC with integration/E2E tests, marks ACs as `checked: true/false`
-2. **Simplify** (`/simplify US X.Y`) — reuse/quality/efficiency review of the diff
-3. **Commit** only after both QA and Simplify pass
-
-> ⚠️ Do NOT skip directly to commit after TDD. QA and Simplify are mandatory steps.
 
 ## Reminders
 

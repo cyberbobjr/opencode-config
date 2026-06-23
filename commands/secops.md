@@ -113,9 +113,13 @@ Persist the results in the story via MCP:
 kanban-update-story("[story_id]", '{"_actor": "secops-tm", "secops_report": {"mode": "threat-model", "surfaces": ["..."], "risks": ["..."], "recommendations": ["..."], "review_required": true/false}}')
 ```
 
-**Pipeline auto-advance:**
-- If `review_required: false` → `kanban-move-story("[story_id]", "tdd", "secops-tm")` — no blocking risk, move to implementation
+**Advance to implementation:**
 - If `review_required: true` → stop and display the Security Brief (user validates before continuing)
+- If `review_required: false` and **called via `/next-story` orchestrator** (the calling context explicitly says "Orchestrator context") → return the report and stop. The orchestrator handles the move to `tdd`.
+- If `review_required: false` and **called standalone** → ask:
+  > "✅ Threat model — no blocking risk. Proceed to TDD implementation? [yes / no]"
+  - **yes** → `kanban-move-story("[story_id]", "tdd", "secops-tm")`
+  - **no** → stop. "To continue later: drag to `tdd` or run `/next-story implement [story_id]`"
 
 ---
 
@@ -231,9 +235,13 @@ Statuses:
 - `failed` — at least one critical issue (must be fixed before QA)
 - `skipped` — no code to audit (documentation story, config, CI)
 
-**Pipeline auto-advance:**
-- If `passed` or `skipped` → `kanban-move-story("[story_id]", "qa", "secops-cr")` — automatic move to QA validation
+**Advance to QA:**
 - If `failed` → stop and display the issues (user fixes before continuing)
+- If `passed` or `skipped` and **called via `/next-story` orchestrator** (the calling context explicitly says "Orchestrator context") → return the report and stop. The orchestrator handles the move to `qa`.
+- If `passed` or `skipped` and **called standalone** → ask:
+  > "✅ SecOps code review — [passed/skipped]. Proceed to QA validation? [yes / no]"
+  - **yes** → `kanban-move-story("[story_id]", "qa", "secops-cr")` → run `/qa [story_id]`
+  - **no** → stop. "To continue later: drag to `qa` or run `/next-story qa [story_id]`"
 
 ## Reminders
 

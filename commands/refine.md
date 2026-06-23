@@ -229,7 +229,12 @@ kanban-update-story("$ARGUMENTS", '{
 }')
 ```
 
-Then call `kanban-move-story("$ARGUMENTS", "secops_tm", "refine")`.
+**Advance to threat model:**
+- **Called via `/next-story` orchestrator** (the calling context explicitly says "Orchestrator context") → call `kanban-move-story("$ARGUMENTS", "secops_tm", "refine")` and return the report. The orchestrator continues.
+- **Called standalone** → ask:
+  > "✅ Refinement complete — [N] ACs validated. Proceed to threat model (`secops_tm`)? [yes / no]"
+  - **yes** → `kanban-move-story("$ARGUMENTS", "secops_tm", "refine")` → run `/secops "$ARGUMENTS" mode=threat-model`
+  - **no** → stop. "To continue later: drag to `secops_tm` or run `/next-story secops-tm $ARGUMENTS`"
 
 ## Anti-patterns
 

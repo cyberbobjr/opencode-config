@@ -151,20 +151,15 @@ cause        = "middleware checks expiration before refresh"
    ```
    The `ac_failures` are used by `/tdd` in `fix-failing-acs` mode to automatically resume.
 
-3. **Pipeline auto-advance:**
-   - If `passed` → `kanban-move-story("$ARGUMENTS", "simplify", "qa")` — automatic move to quality gates
+3. **Advance to quality gates:**
    - If `failed` → stop and display the detailed failure report (user decides: fix, block, or force)
+   - If `passed` and **called via `/next-story` orchestrator** (the calling context explicitly says "Orchestrator context") → return the report and stop. The orchestrator handles the move to `simplify`.
+   - If `passed` and **called standalone** → ask:
+     > "✅ QA passed — [N/N] ACs covered. Proceed to quality gates (`simplify`)? [yes / no]"
+     - **yes** → `kanban-move-story("$ARGUMENTS", "simplify", "qa")` → run `/simplify $ARGUMENTS`
+     - **no** → stop. "To continue later: drag to `simplify` or run `/next-story simplify $ARGUMENTS`"
 4. Return the structured report to the orchestrator agent (see format above)
 5. **If the report contains failed ACs**, ensure the complete diagnosis (file, line, assertion) is usable by TDD in `fix-failing-acs` mode
-
-## Pipeline — Next Steps
-
-After QA passes, the orchestrator **must** continue with:
-
-1. **Simplify** (`/simplify US X.Y`) — reuse/quality/efficiency review of the diff
-2. **Commit** — only after Simplify passes
-
-> ⚠️ Do NOT skip Simplify after QA. It is a mandatory step before commit.
 
 ## Reminders
 

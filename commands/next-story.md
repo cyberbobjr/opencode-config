@@ -88,12 +88,14 @@ Execute each step **actively and sequentially**.
    - **If already `refining`** (triggered from the dashboard): **skip directly to step 2** — do not call `kanban-move-story` again, the dashboard already did it
    - **Otherwise**: call `kanban-move-story("US X.Y", "refining")` then proceed to step 2
 2. Delegate to `/refine US X.Y` — apply `.opencode/commands/refine.md`:
+   > ⚠️ **Orchestrator context**: after /refine completes, do NOT ask about advancing — next-story handles the move to `secops_tm`.
    - Mandatory question/answer cycle via the OpenCode `question` tool
    - 8 to 12 questions alternating the 4 roles (PO, Architect, Dev, DevSecOps)
    - Each question challenges the requirement, proposes improvements, goes further
 3. Retrieve the refinement report (decisions + revised ACs)
 4. Call `kanban-move-story("US X.Y", "secops_tm")` — move to security review
 5. Run `/secops "US X.Y" mode=threat-model` — attack surface identification
+   > ⚠️ **Orchestrator context**: after /secops completes, do NOT ask about advancing — next-story handles the move to `tdd`.
 6. If `review_required: true` → display Security Brief, **[STOP]** request validation before continuing
 7. Call `kanban-move-story("US X.Y", "tdd")` — ready for implementation
 8. **[STOP]** Ask: "Proceed to TDD implementation?" — if yes → Step 2, otherwise STOP
@@ -105,6 +107,7 @@ Execute each step **actively and sequentially**.
 1. Announce: `🧪 Starting TDD cycle for US X.Y...`
 2. Call `kanban-update-story("US X.Y", '{"tdd": {"status": "in_progress"}}')`
 3. Delegate to `/tdd US X.Y` (fully apply `.opencode/commands/tdd.md`):
+   > ⚠️ **Orchestrator context**: after /tdd completes, do NOT ask about advancing — next-story handles the move to `secops_cr`.
    - RED: write the tests (they fail)
    - GREEN: implement the minimum code
    - REFACTOR: clean up without breaking tests
@@ -116,6 +119,7 @@ Execute each step **actively and sequentially**.
    ```
     TDD PASSED → [AUTO] kanban-move-story("US X.Y", "secops_cr")
       → Security review: `/secops "US X.Y" mode=code-review`
+         > ⚠️ **Orchestrator context**: after /secops mode=code-review completes, do NOT ask about advancing — next-story handles the move to `qa`.
       → SecOps PASSED → [AUTO] kanban-move-story("US X.Y", "qa") → Step 3 (QA)
       → SecOps FAILED → [STOP] Ask:
         "What do you want to do?
@@ -136,6 +140,7 @@ Execute each step **actively and sequentially**.
 1. Announce: `🔍 Starting QA agent for US X.Y...`
 2. Call `kanban-update-story("US X.Y", '{"qa": {"status": "in_progress"}}')`
 3. Delegate to `/qa US X.Y` (fully apply `.opencode/commands/qa.md`)
+   > ⚠️ **Orchestrator context**: after /qa completes, do NOT ask about advancing — next-story handles the move to `simplify`.
 4. Retrieve the QA report (status, ac_covered, tests, failures)
 5. **Branch based on result:**
 
@@ -162,6 +167,7 @@ Execute each step **actively and sequentially**.
 
 1. Run the commands listed in `AGENTS.md` section "Before each push / PR"
 2. Run `/simplify US X.Y` — passes the story ID so the report is written to the story
+   > ⚠️ **Orchestrator context**: after /simplify completes, do NOT ask about advancing — next-story moves to `commit_ready` and asks about the commit.
 3. Fix any issues found
 4. Call `kanban-move-story("US X.Y", "commit_ready", "simplify")`
 5. **[STOP]** Ask: "Approve the commit?" — if yes → Step 5, otherwise STOP
@@ -181,6 +187,7 @@ Execute each step **actively and sequentially**.
    - If not yet `refining`: call `kanban-move-story("US X.Y", "refining")`
    - If already `refining`: continue directly (dashboard or MCP already did the move)
 2. Delegate to `/refine US X.Y`
+   > ⚠️ **Orchestrator context**: after /refine completes, do NOT ask about advancing — next-story handles the move to `secops_tm`.
 3. Call `kanban-move-story("US X.Y", "secops_tm")`
 4. Display the report and stop
 
@@ -192,6 +199,7 @@ Used when the dashboard moves a card to the `secops_tm` column (refinement alrea
    - If not yet `secops_tm`: call `kanban-move-story("US X.Y", "secops_tm")`
    - If already `secops_tm`: continue directly
 2. Run `/secops "US X.Y" mode=threat-model`
+   > ⚠️ **Orchestrator context**: after /secops completes, do NOT ask about advancing — next-story handles the move to `tdd`.
 3. If `review_required: true` → display Security Brief and **[STOP]** — wait for user validation
 4. Call `kanban-move-story("US X.Y", "tdd")`
 5. Display summary — story is ready for implementation
@@ -213,6 +221,7 @@ Used when the dashboard moves a card to the `secops_cr` column (TDD already pass
    - If not yet `secops_cr`: call `kanban-move-story("US X.Y", "secops_cr")`
    - If already `secops_cr`: continue directly
 2. Run `/secops "US X.Y" mode=code-review`
+   > ⚠️ **Orchestrator context**: after /secops completes, do NOT ask about advancing — next-story handles the move to `qa`.
 3. If critical issues found → **[STOP]** ask user how to proceed (fix or force-pass)
 4. Call `kanban-move-story("US X.Y", "qa")`
 5. [AUTO] continue with `/next-story qa US X.Y`
@@ -226,6 +235,7 @@ Used when the dashboard moves a card to the `qa` column.
    - If already `qa`: continue directly
 2. Call `kanban-update-story("US X.Y", '{"qa": {"status": "in_progress"}}')`
 3. Delegate to `/qa US X.Y`
+   > ⚠️ **Orchestrator context**: after /qa completes, do NOT ask about advancing — next-story handles the move to `simplify`.
 4. **Branch based on result:**
    - QA PASSED → `kanban-update-story` qa.status=passed → `kanban-move-story("US X.Y", "simplify")` → [AUTO] `/next-story simplify US X.Y`
    - QA FAILED → display failures → **[STOP]** ask: fix (back to TDD) / block / force-pass
@@ -238,6 +248,7 @@ Used when the dashboard moves a card to the `simplify` column.
 1. Retrieve context via `kanban-get-story("US X.Y")`
 2. Run the commands listed in `AGENTS.md` section "Before each push / PR"
 3. Run `/simplify US X.Y` — passes the story ID so the report is written to the story
+   > ⚠️ **Orchestrator context**: after /simplify completes, do NOT ask about advancing — next-story moves to `commit_ready` and displays the summary.
 4. Fix any issues found
 5. Call `kanban-move-story("US X.Y", "commit_ready", "simplify")`
 6. Display summary — the story is ready for commit
