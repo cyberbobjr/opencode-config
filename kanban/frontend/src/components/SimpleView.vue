@@ -53,7 +53,7 @@ function handleChange(change, group) {
         item-key="id"
         class="flex-1 min-h-12 rounded-b-lg bg-slate-800/40 p-2 space-y-2 border border-t-0 border-slate-800"
         ghost-class="opacity-30"
-        chosen-class="ring-1 ring-slate-400"
+        chosen-class="drag-chosen"
         @change="(e) => handleChange(e, group)"
       >
         <template #item="{ element }">

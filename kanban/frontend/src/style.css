@@ -17,6 +17,9 @@
 .md :deep(strong) { @apply font-semibold text-slate-200; }
 .md :deep(em)     { @apply italic text-slate-300; }
 .md :deep(a)      { @apply text-blue-400 underline hover:text-blue-300; }
+
+/* SortableJS chosen drag item */
+.drag-chosen { @apply ring-1 ring-slate-400; }
 .md :deep(hr)     { @apply border-slate-700 my-3; }
 .md :deep(table)  { @apply w-full text-sm mb-2 border-collapse; }
 .md :deep(th) { @apply bg-slate-700 text-slate-200 px-2 py-1 text-left border border-slate-600; }
