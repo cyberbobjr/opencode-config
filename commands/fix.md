@@ -34,12 +34,19 @@ Infer each field. Do NOT leave any field empty or generic.
 | `stack` | Infer from the impacted component/file found in the scan. At least one value required. |
 | `notes` | Reproduction context: conditions, environment, frequency. File path and line if identified. Related User Story if relevant. |
 
-**Description format** (mandatory, 3 parts):
+**Description format** (mandatory markdown, 3 sections):
 ```
-**Bug:** [What is broken — current observable behavior.]
-**Contexte:** [When / where it happens — route, component, user action, or condition.]
-**Attendu:** [What the correct behavior should be.]
+## Bug
+[What is broken — current observable behavior.]
+
+## Contexte
+[When / where it happens — route, component, user action, or condition.]
+
+## Comportement attendu
+[What the correct behavior should be.]
 ```
+
+> ⚠️ When writing the JSON string value, use `\n\n` between sections and `\n` between heading and body. The description is rendered as markdown in the Kanban dashboard.
 
 ### 0.3 — Show preview and confirm
 
@@ -49,9 +56,13 @@ Display the qualified story as a preview block:
 🐛 Bug Story Preview
 ─────────────────────────────────
 title       : [Fix — ...]
-description : **Bug:** ...
-              **Contexte:** ...
-              **Attendu:** ...
+description :
+  ## Bug
+  [current broken behavior]
+  ## Contexte
+  [when/where it happens]
+  ## Comportement attendu
+  [correct behavior]
 priority    : [P0/P1/P2]
 stack       : [backend, ...]
 notes       : [reproduction context or "none"]

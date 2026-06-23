@@ -189,10 +189,23 @@ At the end of refinement, persist EVERYTHING in a single call.
 
 > **Note:** The `"stack"` field must mirror exactly the content of `implementation_guide.scope` — this is what the dashboard displays as card categories.
 
+> ⚠️ **Description must be valid markdown** — rendered in the Kanban modal. Use `\n\n` between sections and `\n` between a heading and its body. Minimum expected structure:
+> ```
+> ## User Story
+> **En tant que** [rôle], je veux [fonctionnalité], afin de [bénéfice].
+>
+> ## Contexte
+> [Refined context after dialogue — what the story covers and why.]
+>
+> ## Décisions clés
+> - [Decision 1 from refinement]
+> - [Decision 2 from refinement]
+> ```
+
 ```python
 kanban-update-story("$ARGUMENTS", '{
   "_actor": "refine",
-  "description": "Updated functional description",
+  "description": "## User Story\n**En tant que** [rôle], je veux [fonctionnalité], afin de [bénéfice].\n\n## Contexte\n[Refined context after dialogue.]\n\n## Décisions clés\n- [Decision 1]\n- [Decision 2]",
   "stack": ["backend", "database"],
   "acceptance_criteria": [
     {"id": 1, "text": "Revised AC 1", "checked": false},

@@ -35,12 +35,19 @@ Infer each field. Do NOT leave any field empty or generic.
 | `stack` | Changes often touch multiple layers — list all impacted stacks. At least one value required. |
 | `notes` | **Required for changes**: list of impacted stories (US X.Y) and impacted files/modules found during the scan. Note any breaking changes or backward-compatibility risks. |
 
-**Description format** (mandatory, 3 parts):
+**Description format** (mandatory markdown, 3 sections):
 ```
-**Motivation:** [Why this change is needed — the problem it solves or the opportunity it captures.]
-**Périmètre:** [What is changing — modules, files, interfaces, contracts, data schemas.]
-**Risques:** [Breaking changes, backward compatibility concerns, rollback strategy needed.]
+## Motivation
+[Why this change is needed — the problem it solves or the opportunity it captures.]
+
+## Périmètre
+[What is changing — modules, files, interfaces, contracts, data schemas.]
+
+## Risques
+[Breaking changes, backward compatibility concerns, rollback strategy needed.]
 ```
+
+> ⚠️ When writing the JSON string value, use `\n\n` between sections and `\n` between heading and body. The description is rendered as markdown in the Kanban dashboard.
 
 ### 0.3 — Show preview and confirm
 
@@ -50,9 +57,13 @@ Display the qualified story as a preview block:
 🔄 Change Story Preview
 ─────────────────────────────────
 title       : [Change — ...]
-description : **Motivation:** ...
-              **Périmètre:** ...
-              **Risques:** ...
+description :
+  ## Motivation
+  [why this change is needed]
+  ## Périmètre
+  [what is changing]
+  ## Risques
+  [breaking changes / rollback]
 priority    : [P0/P1/P2]
 stack       : [backend, database, ...]
 notes       : Impacted stories: US X.Y, US X.Z

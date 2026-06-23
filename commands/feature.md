@@ -29,10 +29,21 @@ Infer each field. Do NOT leave any field empty or generic.
 | Field | Rule |
 |-------|------|
 | `title` | Imperative verb + subject, ≤60 chars. No "feature" prefix. (e.g. "Exporter les briefings en CSV") |
-| `description` | User story format: "En tant que [role], je veux [feature], afin de [benefit]." One sentence per part. |
+| `description` | Markdown format (see below). Rendered in the Kanban modal — must be valid markdown with `\n\n` between sections. |
 | `priority` | `P2` default. Upgrade to `P1` if the feature unblocks critical flows. `P0` only if required to ship. |
 | `stack` | Subset of: `backend`, `frontend`, `database`, `devops`, `infrastructure`, `architecture`, `security`, `docs`. Infer from feature nature (UI component → frontend, new endpoint → backend, schema change → database, etc.). At least one value required. |
 | `notes` | Open questions, assumptions, related User Stories, or constraints identified from the codebase scan. Empty string if none. |
+
+**Description format** (mandatory markdown, 2 sections):
+```
+## User Story
+**En tant que** [rôle], je veux **[fonctionnalité]**, afin de **[bénéfice]**.
+
+## Contexte
+[Pourquoi cette fonctionnalité est nécessaire, quel problème elle résout, quelles hypothèses ont été faites.]
+```
+
+> ⚠️ When writing the JSON string value, use `\n\n` between sections and `\n` between heading and body. The description is rendered as markdown in the Kanban dashboard.
 
 ### 0.3 — Show preview and confirm
 
@@ -42,7 +53,11 @@ Display the qualified story as a preview block:
 📋 Story Preview
 ─────────────────────────────────
 title       : [title]
-description : [description]
+description :
+  ## User Story
+  En tant que [rôle], je veux [fonctionnalité], afin de [bénéfice].
+  ## Contexte
+  [context]
 priority    : [P0/P1/P2]
 stack       : [backend, frontend, ...]
 notes       : [notes or "none"]
