@@ -1,11 +1,16 @@
 <script setup>
-import { STACK_COLORS, STATUS_COLORS, STATUS_LABELS, TRIGGERABLE_STATUSES } from '../constants.js'
+import { computed } from 'vue'
+import { STACK_COLORS, STATUS_COLORS, STATUS_LABELS, TRIGGERABLE_STATUSES, KANBAN_COLUMNS } from '../constants.js'
 
 const props = defineProps({
   story: { type: Object, required: true },
   showStatus: { type: Boolean, default: false },
 })
-const emit = defineEmits(['click', 'trigger'])
+const emit = defineEmits(['click', 'trigger', 'move'])
+
+const colIndex = computed(() => KANBAN_COLUMNS.findIndex(c => c.status === props.story.status))
+const prevCol  = computed(() => colIndex.value > 0 ? KANBAN_COLUMNS[colIndex.value - 1] : null)
+const nextCol  = computed(() => colIndex.value < KANBAN_COLUMNS.length - 1 ? KANBAN_COLUMNS[colIndex.value + 1] : null)
 </script>
 
 <template>
@@ -38,6 +43,23 @@ const emit = defineEmits(['click', 'trigger'])
       >{{ tag }}</span>
       <span v-if="story.tdd?.status === 'done' || story.tdd?.status === 'passed'" class="ml-auto text-xs text-emerald-400" title="TDD OK">✓ TDD</span>
       <span v-if="story.qa?.status === 'done'  || story.qa?.status === 'passed'"  class="text-xs text-pink-400"    title="QA OK">✓ QA</span>
+    </div>
+
+    <!-- Move buttons — visible on hover -->
+    <div class="opacity-0 group-hover:opacity-100 transition-opacity flex justify-between gap-1 mt-2 -mx-0.5">
+      <button
+        v-if="prevCol"
+        class="flex-1 text-xs px-1.5 py-1 rounded bg-slate-700 hover:bg-slate-600 text-slate-400 hover:text-slate-200 truncate text-left transition-colors"
+        :title="`← ${prevCol.label}`"
+        @click.stop="emit('move', prevCol.status)"
+      >← {{ prevCol.label }}</button>
+      <div v-else class="flex-1" />
+      <button
+        v-if="nextCol"
+        class="flex-1 text-xs px-1.5 py-1 rounded bg-slate-700 hover:bg-slate-600 text-slate-400 hover:text-slate-200 truncate text-right transition-colors"
+        :title="`${nextCol.label} →`"
+        @click.stop="emit('move', nextCol.status)"
+      >{{ nextCol.label }} →</button>
     </div>
 
     <!-- ▶ Trigger button — visible on hover, only for triggerable statuses -->

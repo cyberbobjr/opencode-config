@@ -65,7 +65,12 @@ function handleChange(change, status) {
         @change="(e) => handleChange(e, col.status)"
       >
         <template #item="{ element }">
-          <KanbanCard :story="element" @click="emit('open-modal', element.id)" @trigger="emit('trigger', element.id)" />
+          <KanbanCard
+            :story="element"
+            @click="emit('open-modal', element.id)"
+            @trigger="emit('trigger', element.id)"
+            @move="(status) => emit('move', { id: element.id, status })"
+          />
         </template>
       </draggable>
     </div>
