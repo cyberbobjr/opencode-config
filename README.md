@@ -223,6 +223,32 @@ The dashboard at `http://localhost:8765` has five views, toggled from the header
 
 Every view shares the same search bar (filters by ID, title, or stack tag) and opens the same edit modal on click.
 
+### Screenshots
+
+**Kanban view** — 10-column drag-and-drop board:
+![Kanban](kanban/screenshots/01-kanban.png)
+
+**Simple view** — 5 meta-columns:
+![Simple](kanban/screenshots/02-simple.png)
+
+**Focus view** — active story pipeline progress:
+![Focus](kanban/screenshots/03-focus.png)
+
+**Journal view** — global activity timeline:
+![Journal](kanban/screenshots/04-journal.png)
+
+**List view** — sortable table:
+![List](kanban/screenshots/05-list.png)
+
+**Modal — Specification tab**:
+![Modal Spec](kanban/screenshots/06-modal-spec.png)
+
+**Modal — Progress tab** (TDD, QA, SecOps, Simplify):
+![Modal Progress](kanban/screenshots/07-modal-progress.png)
+
+**Modal — History tab** (append-only audit trail with timestamps):
+![Modal History](kanban/screenshots/08-modal-history.png)
+
 ### Edit modal
 
 The modal has four tabs:
@@ -287,7 +313,7 @@ Key rule: **moves made by the agent do not trigger dashboard commands** (agents 
 
 ## MCP tools
 
-The Kanban server exposes 7 tools:
+The Kanban server exposes 8 tools:
 
 | Tool | Description |
 |------|-------------|
@@ -296,7 +322,8 @@ The Kanban server exposes 7 tools:
 | `kanban-update-story` | Partially update a story (TDD results, ACs, implementation guide…) |
 | `kanban-move-story` | Move a story to a new column + log the change |
 | `kanban-create-story` | Create a new story — always sets `status: pending` |
-| `kanban-get-next-pending` | Get the highest-priority pending story |
+| `kanban-get-next-pending` | Get the highest-priority pending story (`priority_score` first, then P0→P1→P2→phase) |
+| `kanban-bulk-prioritize` | Set priority scores on N stories in one atomic call |
 | `kanban-get-stats` | Get global pipeline counts |
 
 See [`kanban/README.md`](kanban/README.md) for the full schema, merge rules, and debug logging reference.
@@ -306,9 +333,13 @@ The server also exposes additional REST endpoints consumed by the dashboard:
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | `PATCH` | `/api/stories/{sid}/move` | Move a story to a new status (body: `{ status, actor }`) |
+| `POST` | `/api/stories/{sid}/trigger` | Fire the OpenCode command for the story's current status without moving it |
 | `GET` | `/api/history` | Aggregated history across all stories, sorted by timestamp desc |
 | `POST` | `/api/reorder` | Reorder cards within a column (body: `{ status, order: [ids] }`) |
 | `GET` | `/api/events` | SSE stream — sends `data: refresh` on every story change |
+| `GET` | `/api/stats` | Global pipeline counts |
+| `POST` | `/api/reload` | Force cache invalidation (picks up files written directly to disk) |
+| `GET` | `/api/debug` | Last 50 trigger events (diagnostics) |
 
 ---
 
@@ -419,6 +450,8 @@ Each story is stored as `user-stories/us-X-Y.json`:
   "description": "...",       // filled by /feature, /fix, /change or /refine
   "status": "pending",
   "priority": "P0",           // P0 | P1 | P2
+  "order": 0,                 // position within the column
+  "priority_score": 0,        // 0–100, set by kanban-bulk-prioritize. Higher = processed first.
   "stack": ["backend"],       // filled by /feature, /fix, /change or /refine
   "acceptance_criteria": [
     {"id": 1, "text": "...", "checked": false}
@@ -428,9 +461,11 @@ Each story is stored as `user-stories/us-X-Y.json`:
   "implementation_guide": {}, // filled by /refine
   "refine_decisions": [],     // filled by /refine
   "secops_report": {},        // filled by /secops (both modes)
-  "simplify_report": {},      // filled by /simplify
+  "simplify_comments": "",    // filled by /simplify
   "notes": "",
-  "history": []               // append-only audit trail
+  "history": [],              // append-only audit trail
+  "created_at": "2026-06-24T14:00:00", // ISO datetime, server-managed
+  "updated_at": "2026-06-24T14:00:00"  // ISO datetime, server-managed
 }
 ```
 

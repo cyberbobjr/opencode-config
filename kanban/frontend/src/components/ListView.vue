@@ -42,7 +42,7 @@ function sortIcon(key) {
 }
 
 function priorityLabel(p) {
-  return { low: 'Basse', medium: 'Moy.', high: 'Haute', critical: 'Crit.' }[p] ?? p
+  return { low: 'Low', medium: 'Med.', high: 'High', critical: 'Crit.' }[p] ?? p
 }
 </script>
 
@@ -54,9 +54,9 @@ function priorityLabel(p) {
           <th
             v-for="col in [
               { key: 'id', label: 'ID' },
-              { key: 'title', label: 'Titre' },
-              { key: 'status', label: 'Statut' },
-              { key: 'priority', label: 'Priorité' },
+              { key: 'title', label: 'Title' },
+              { key: 'status', label: 'Status' },
+              { key: 'priority', label: 'Priority' },
               { key: 'stack', label: 'Stack' },
             ]"
             :key="col.key"
@@ -104,6 +104,6 @@ function priorityLabel(p) {
         </tr>
       </tbody>
     </table>
-    <p v-if="!sorted.length" class="text-slate-500 text-sm text-center py-8">Aucune story</p>
+    <p v-if="!sorted.length" class="text-slate-500 text-sm text-center py-8">No stories</p>
   </div>
 </template>

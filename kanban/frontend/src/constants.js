@@ -1,14 +1,14 @@
 export const STATUS_LABELS = {
-  pending:      'En attente',
-  refining:     'Raffinement',
+  pending:      'Pending',
+  refining:     'Refining',
   secops_tm:    'SecOps TM',
   tdd:          'TDD',
   secops_cr:    'SecOps CR',
   qa:           'QA',
   simplify:     'Simplify',
-  commit_ready: 'Prêt commit',
-  completed:    'Terminé',
-  blocked:      'Bloqué',
+  commit_ready: 'Commit Ready',
+  completed:    'Done',
+  blocked:      'Blocked',
 }
 
 export const STATUS_COLORS = {
@@ -31,11 +31,11 @@ export const KANBAN_COLUMNS = Object.entries(STATUS_LABELS).map(([status, label]
 }))
 
 export const SIMPLE_GROUPS = [
-  { id: 'backlog',     label: 'Backlog',         color: '#6b7280', statuses: ['pending'],                                   dropTo: 'pending'      },
-  { id: 'en_cours',   label: 'En cours',         color: '#3b82f6', statuses: ['refining', 'secops_tm', 'tdd', 'secops_cr'], dropTo: 'tdd'          },
-  { id: 'validation', label: 'Validation',       color: '#ec4899', statuses: ['qa', 'simplify'],                            dropTo: 'qa'           },
-  { id: 'pret',       label: 'Prêt',             color: '#10b981', statuses: ['commit_ready'],                              dropTo: 'commit_ready' },
-  { id: 'termine',    label: 'Terminé / Bloqué', color: '#065f46', statuses: ['completed', 'blocked'],                      dropTo: 'completed'    },
+  { id: 'backlog',     label: 'Backlog',          color: '#6b7280', statuses: ['pending'],                                   dropTo: 'pending'      },
+  { id: 'en_cours',   label: 'In Progress',       color: '#3b82f6', statuses: ['refining', 'secops_tm', 'tdd', 'secops_cr'], dropTo: 'tdd'          },
+  { id: 'validation', label: 'Validation',        color: '#ec4899', statuses: ['qa', 'simplify'],                            dropTo: 'qa'           },
+  { id: 'pret',       label: 'Ready',             color: '#10b981', statuses: ['commit_ready'],                              dropTo: 'commit_ready' },
+  { id: 'termine',    label: 'Done / Blocked',    color: '#065f46', statuses: ['completed', 'blocked'],                      dropTo: 'completed'    },
 ]
 
 export const PIPELINE_STEPS = [
@@ -67,10 +67,10 @@ export const STACK_COLORS = {
 }
 
 export const PRIORITY_OPTIONS = [
-  { value: 'low',      label: 'Basse',    color: '#60a5fa' },
-  { value: 'medium',   label: 'Moyenne',  color: '#fbbf24' },
-  { value: 'high',     label: 'Haute',    color: '#fb923c' },
-  { value: 'critical', label: 'Critique', color: '#f87171' },
+  { value: 'low',      label: 'Low',      color: '#60a5fa' },
+  { value: 'medium',   label: 'Medium',   color: '#fbbf24' },
+  { value: 'high',     label: 'High',     color: '#fb923c' },
+  { value: 'critical', label: 'Critical', color: '#f87171' },
 ]
 
 export const PRIORITY_COLORS = {

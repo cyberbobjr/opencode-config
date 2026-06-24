@@ -126,7 +126,7 @@ function handleSave() {
 }
 
 function confirmDelete() {
-  if (window.confirm(`Supprimer la story ${props.story.id} ?`)) {
+  if (window.confirm(`Delete story ${props.story.id}?`)) {
     emit('delete', { id: props.story.id })
   }
 }
@@ -148,7 +148,7 @@ function confirmDelete() {
         </div>
         <button
           class="text-slate-500 hover:text-slate-200 transition-colors text-xl leading-none mt-0.5"
-          title="Fermer (ESC)"
+          title="Close (ESC)"
           @click="emit('close')"
         >×</button>
       </div>
@@ -157,10 +157,10 @@ function confirmDelete() {
       <div class="flex border-b border-slate-800 px-6">
         <button
           v-for="tab in [
-            { id: 'spec',     label: 'Spécification' },
-            { id: 'refine',   label: 'Raffinement'   },
-            { id: 'progress', label: 'Avancement'    },
-            { id: 'history',  label: 'Historique'    },
+            { id: 'spec',     label: 'Specification' },
+            { id: 'refine',   label: 'Refinement'    },
+            { id: 'progress', label: 'Progress'      },
+            { id: 'history',  label: 'History'       },
           ]"
           :key="tab.id"
           class="text-sm px-4 py-2.5 border-b-2 transition-colors"
@@ -180,11 +180,11 @@ function confirmDelete() {
           <!-- Priority (editable) + Status (read-only) -->
           <div class="grid grid-cols-2 gap-4">
             <div>
-              <label class="label">Priorité <span class="text-primary ml-1">✎</span></label>
+              <label class="label">Priority <span class="text-primary ml-1">✎</span></label>
               <SelectField v-model="editData.priority" :options="PRIORITY_OPTIONS" />
             </div>
             <div>
-              <label class="label">Statut</label>
+              <label class="label">Status</label>
               <div
                 class="flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-700 bg-slate-800/50"
               >
@@ -199,7 +199,7 @@ function confirmDelete() {
 
           <!-- Stack (editable) -->
           <div>
-            <label class="label">Stack <span class="text-primary ml-1">✎</span></label>
+            <label class="label">Stack <span class="text-primary ml-1">✎</span></label><!-- stack tag unchanged -->
             <div class="flex flex-wrap gap-2">
               <button
                 v-for="tag in STACK_OPTIONS"
@@ -218,7 +218,7 @@ function confirmDelete() {
 
           <!-- Description (read-only markdown) -->
           <div v-if="story.description">
-            <label class="label">Description</label>
+            <label class="label">Description</label><!-- en -->
             <div class="bg-slate-800/50 rounded-lg p-4 border border-slate-700/60">
               <MarkdownContent :content="story.description" />
             </div>
@@ -227,7 +227,7 @@ function confirmDelete() {
           <!-- Acceptance Criteria (read-only) -->
           <div>
             <label class="label">
-              Critères d'acceptation
+              Acceptance Criteria
               <span
                 v-if="displayACs.length"
                 class="ml-2 text-slate-600 font-normal"
@@ -253,7 +253,7 @@ function confirmDelete() {
                   {{ ac.text }}
                 </span>
               </div>
-              <p v-if="!displayACs.length" class="text-sm text-slate-600 italic">Aucun critère</p>
+              <p v-if="!displayACs.length" class="text-sm text-slate-600 italic">No criteria</p>
             </div>
           </div>
 
@@ -262,11 +262,11 @@ function confirmDelete() {
         <!-- ── Raffinement ───────────────────────────────────────── -->
         <template v-else-if="activeTab === 'refine'">
           <p v-if="!refinementDecisions.length && !implGuide" class="text-slate-500 text-sm italic">
-            Pas encore de raffinement effectué.
+            No refinement done yet.
           </p>
 
           <div v-if="refinementDecisions.length">
-            <label class="label">Décisions de raffinement</label>
+            <label class="label">Refinement decisions</label>
             <div class="space-y-4">
               <div
                 v-for="(d, idx) in refinementDecisions"
@@ -275,13 +275,13 @@ function confirmDelete() {
               >
                 <div v-if="d.role" class="text-xs text-slate-500 uppercase font-medium mb-1">{{ d.role }}</div>
                 <div v-if="d.question" class="text-sm font-medium text-slate-300 mb-2">{{ d.question }}</div>
-                <MarkdownContent :content="d.decision" placeholder="Pas de décision" />
+                <MarkdownContent :content="d.decision" placeholder="No decision" />
               </div>
             </div>
           </div>
 
           <div v-if="implGuide">
-            <label class="label">Guide d'implémentation</label>
+            <label class="label">Implementation guide</label>
             <div class="bg-slate-800 rounded-lg p-4 border border-slate-700">
               <template v-if="typeof implGuide === 'string'">
                 <MarkdownContent :content="implGuide" />
@@ -301,7 +301,7 @@ function confirmDelete() {
 
           <!-- Notes (read-only) -->
           <div v-if="story.notes">
-            <label class="label">Notes</label>
+            <label class="label">Notes</label><!-- en -->
             <div class="bg-slate-800/50 rounded-lg p-4 border border-slate-700/60">
               <MarkdownContent :content="story.notes" />
             </div>
@@ -331,7 +331,7 @@ function confirmDelete() {
               </div>
             </div>
             <div v-if="tddNotes">
-              <label class="label text-xs">Résumé TDD</label>
+              <label class="label text-xs">TDD Summary</label>
               <div class="bg-slate-900/60 rounded-lg p-3 border border-slate-700/50">
                 <MarkdownContent :content="tddNotes" />
               </div>
@@ -354,7 +354,7 @@ function confirmDelete() {
               >{{ story.qa.status }}</span>
             </div>
             <div v-if="story.qa?.ac_covered" class="text-sm text-slate-400">
-              ACs couverts : <span class="text-slate-200 font-medium">{{ story.qa.ac_covered }}</span>
+              ACs covered: <span class="text-slate-200 font-medium">{{ story.qa.ac_covered }}</span>
             </div>
             <div v-if="story.qa?.notes">
               <MarkdownContent :content="story.qa.notes" />
@@ -363,7 +363,7 @@ function confirmDelete() {
 
           <!-- SecOps CR (read-only) -->
           <div v-if="secopsNotes">
-            <label class="label">SecOps CR — Rapport</label>
+            <label class="label">SecOps CR — Report</label>
             <div class="bg-slate-800/60 rounded-lg p-4 border border-slate-700">
               <MarkdownContent :content="secopsNotes" />
             </div>
@@ -371,10 +371,10 @@ function confirmDelete() {
 
           <!-- Simplify (read-only) -->
           <div v-if="simplifyComments || simplifyDone">
-            <label class="label">Simplify — Résumé</label>
+            <label class="label">Simplify — Summary</label>
             <div class="bg-slate-800/60 rounded-lg p-4 border border-slate-700">
               <MarkdownContent v-if="simplifyComments" :content="simplifyComments" />
-              <p v-else class="text-sm text-slate-500 italic">Stage complété — aucun commentaire enregistré.</p>
+              <p v-else class="text-sm text-slate-500 italic">Stage completed — no comments recorded.</p>
             </div>
           </div>
 
@@ -382,7 +382,7 @@ function confirmDelete() {
             v-if="!story.notes && !story.tdd?.status && !story.qa?.status && !secopsNotes && !simplifyComments"
             class="text-slate-600 text-sm italic"
           >
-            Aucune donnée d'avancement pour l'instant.
+            No progress data yet.
           </p>
         </template>
 
@@ -392,14 +392,14 @@ function confirmDelete() {
           <!-- Timestamps -->
           <div class="flex gap-6 text-xs text-slate-500 pb-1 border-b border-slate-800 mb-1">
             <span v-if="story.created_at">
-              Créée le <span class="text-slate-400 font-mono">{{ formatTs(story.created_at) }}</span>
+              Created <span class="text-slate-400 font-mono">{{ formatTs(story.created_at) }}</span>
             </span>
             <span v-if="story.updated_at">
-              Mise à jour <span class="text-slate-400 font-mono">{{ formatTs(story.updated_at) }}</span>
+              Updated <span class="text-slate-400 font-mono">{{ formatTs(story.updated_at) }}</span>
             </span>
           </div>
 
-          <p v-if="!storyHistory.length" class="text-slate-500 text-sm italic">Pas d'historique.</p>
+          <p v-if="!storyHistory.length" class="text-slate-500 text-sm italic">No history.</p>
 
           <div v-else class="space-y-3">
             <div
@@ -448,7 +448,7 @@ function confirmDelete() {
                     <span class="text-xs text-slate-400">{{ change }}</span>
                   </div>
                 </template>
-                <p v-if="!entry.changes?.length" class="text-xs text-slate-600 italic">Aucun détail</p>
+                <p v-if="!entry.changes?.length" class="text-xs text-slate-600 italic">No details</p>
               </div>
             </div>
           </div>
@@ -459,17 +459,17 @@ function confirmDelete() {
       <!-- Footer -->
       <div class="flex items-center justify-between px-6 py-4 border-t border-slate-800">
         <button class="text-xs text-red-500 hover:text-red-400 transition-colors" @click="confirmDelete">
-          Supprimer
+          Delete
         </button>
         <div class="flex items-center gap-3">
           <button
             class="text-sm text-slate-400 hover:text-slate-200 px-4 py-2 transition-colors"
             @click="emit('close')"
-          >Annuler</button>
+          >Cancel</button>
           <button
             class="text-sm bg-primary hover:bg-primary-dark text-white px-5 py-2 rounded-lg transition-colors font-medium"
             @click="handleSave"
-          >Sauvegarder</button>
+          >Save</button>
         </div>
       </div>
     </div>

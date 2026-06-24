@@ -39,7 +39,7 @@ function stepIndex(story) {
   <div class="max-w-3xl mx-auto py-8">
     <!-- Story selector -->
     <div v-if="inProgressStories.length > 1" class="flex items-center gap-3 mb-6">
-      <span class="text-sm text-slate-400">Story active :</span>
+      <span class="text-sm text-slate-400">Active story:</span>
       <select
         v-model="selectedId"
         class="bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-sm text-slate-200 focus:border-slate-500 focus:outline-none"
@@ -51,7 +51,7 @@ function stepIndex(story) {
     </div>
 
     <div v-if="!activeStory" class="text-center text-slate-500 py-16">
-      Aucune story en cours
+      No story in progress
     </div>
 
     <template v-else>

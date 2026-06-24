@@ -46,14 +46,32 @@ Au cœur du système : un serveur Kanban qui fonctionne simultanément comme **t
 │   ├── code-simplify-quality.md
 │   └── code-simplify-efficiency.md
 │
-└── kanban/                — Serveur Kanban MCP
-    ├── server.py          — Serveur principal (FastAPI + FastMCP)
+└── kanban/                — Serveur Kanban MCP + tableau de bord Vue
+    ├── server.py          — Serveur principal (FastAPI + FastMCP, sert dist/)
     ├── requirements.txt
     ├── migrate.py         — Migration de schéma pour les stories existantes
-    ├── templates/
-    │   └── dashboard.html
-    └── static/
-        └── app.js
+    ├── screenshots/       — Captures d'écran du tableau de bord
+    ├── dist/              — Application Vue compilée (servie par FastAPI sur /)
+    │   ├── index.html
+    │   └── assets/        — Bundles JS + CSS (hachés par Vite)
+    └── frontend/          — Source Vue 3 (modifier ici, puis npm run build)
+        ├── package.json
+        ├── vite.config.js
+        ├── tailwind.config.js
+        └── src/
+            ├── App.vue
+            ├── api.js
+            ├── constants.js
+            └── components/
+                ├── KanbanBoard.vue
+                ├── SimpleView.vue
+                ├── FocusView.vue
+                ├── JournalView.vue
+                ├── ListView.vue
+                ├── StoryModal.vue
+                ├── KanbanCard.vue
+                ├── StatsBar.vue
+                └── MarkdownContent.vue
 ```
 
 Les données des stories vivent **en dehors** de ce dépôt, dans `user-stories/*.json` à la racine du projet — un fichier JSON par story, servis par le serveur Kanban.
@@ -68,7 +86,23 @@ Les données des stories vivent **en dehors** de ce dépôt, dans `user-stories/
 pip install -r .opencode/kanban/requirements.txt
 ```
 
-### 2. Démarrer le serveur Kanban
+### 2. Compiler le tableau de bord (première fois uniquement)
+
+Le dossier `dist/` est inclus dans le dépôt et prêt à l'emploi. Pour recompiler après modification du frontend Vue :
+
+```bash
+cd .opencode/kanban/frontend
+npm install   # première fois seulement
+npm run build # sortie → ../dist/
+```
+
+Pour le développement avec rechargement à chaud (proxy vers le backend sur `:8765`) :
+
+```bash
+npm run dev   # serveur Vite sur http://localhost:5173
+```
+
+### 3. Démarrer le serveur Kanban
 
 OpenCode démarre automatiquement le serveur via MCP. Vous pouvez aussi le lancer manuellement :
 
@@ -84,7 +118,7 @@ Dashboard accessible sur : `http://localhost:8765`
 
 > **Important** : laissez OpenCode démarrer le serveur — il bind à la fois MCP (stdio) et HTTP (port 8765) dans le même processus. Lancer une deuxième instance crée deux processus avec des états désynchronisés.
 
-### 3. Configurer OpenCode
+### 4. Configurer OpenCode
 
 Le fichier `opencode.json` de ce dépôt connecte déjà le serveur Kanban comme fournisseur MCP :
 
@@ -103,7 +137,7 @@ Le fichier `opencode.json` de ce dépôt connecte déjà le serveur Kanban comme
 
 Copiez-le à la racine de votre projet (ou fusionnez avec votre `opencode.json` existant).
 
-### 4. Ajouter vos conventions projet
+### 5. Ajouter vos conventions projet
 
 Les commandes référencent `AGENTS.md` à la racine du projet pour les détails spécifiques à votre stack (runner de tests, commandes lint, chemins de fichiers, design system). Créez-en un si vous n'en avez pas — voir la section [Template AGENTS.md](#template-agentsmd) ci-dessous.
 
@@ -176,6 +210,59 @@ Chaque déplacement de colonne passe par `/next-story` avec le sous-commande cor
 
 ---
 
+## Vues du tableau de bord
+
+Le tableau de bord sur `http://localhost:8765` propose cinq vues, accessibles depuis l'en-tête :
+
+| Vue | Bouton | Description |
+|-----|--------|-------------|
+| **Kanban** | `Kanban` | Tableau complet à 10 colonnes — une colonne par statut du pipeline. Glisser les cartes entre colonnes déclenche la commande correspondante dans OpenCode. |
+| **Simple** | `Simple` | 5 méta-colonnes (Backlog / In Progress / Validation / Ready / Done). Un déplacement inter-colonne déplace la story vers le statut cible du groupe. |
+| **Focus** | `Focus` | Affiche la story active (la plus récemment déplacée, non pending/done) sous forme de barre de progression du pipeline. |
+| **Journal** | `Journal` | Chronologie d'activité globale — toutes les entrées d'historique de toutes les stories, groupées par date. |
+| **List** | `List` | Tableau trié de toutes les stories (ID, titre, statut, priorité, stack). |
+
+Toutes les vues partagent la même barre de recherche (filtre par ID, titre ou tag stack) et ouvrent le même modal d'édition au clic.
+
+### Captures d'écran
+
+**Vue Kanban** — tableau 10 colonnes avec drag-and-drop :
+![Kanban](kanban/screenshots/01-kanban.png)
+
+**Vue Simple** — 5 méta-colonnes :
+![Simple](kanban/screenshots/02-simple.png)
+
+**Vue Focus** — suivi de la story active dans le pipeline :
+![Focus](kanban/screenshots/03-focus.png)
+
+**Vue Journal** — historique d'activité global :
+![Journal](kanban/screenshots/04-journal.png)
+
+**Vue List** — tableau trié :
+![List](kanban/screenshots/05-list.png)
+
+**Modal — onglet Spécification** :
+![Modal Spec](kanban/screenshots/06-modal-spec.png)
+
+**Modal — onglet Avancement** (TDD, QA, SecOps, Simplify) :
+![Modal Progress](kanban/screenshots/07-modal-progress.png)
+
+**Modal — onglet Historique** (audit trail avec timestamps) :
+![Modal History](kanban/screenshots/08-modal-history.png)
+
+### Modal d'édition
+
+Le modal propose quatre onglets :
+
+| Onglet | Contenu | Modifiable ? |
+|--------|---------|--------------|
+| **Specification** | Titre, priorité, statut, stack, description, critères d'acceptation | ✅ |
+| **Refinement** | Décisions de raffinement, guide d'implémentation | Lecture seule (généré par l'agent, rendu Markdown) |
+| **Progress** | Notes, TDD (statut/tests/couverture), QA, rapport SecOps, résumé Simplify | Mixte |
+| **History** | Journal d'audit append-only de la story | Lecture seule |
+
+---
+
 ## Commandes vs Agents
 
 OpenCode distingue deux concepts :
@@ -225,7 +312,7 @@ Règle clé : **les déplacements faits par l'agent ne déclenchent pas de comma
 
 ## Outils MCP
 
-Le serveur Kanban expose 7 outils :
+Le serveur Kanban expose 8 outils :
 
 | Outil | Description |
 |-------|-------------|
@@ -234,7 +321,8 @@ Le serveur Kanban expose 7 outils :
 | `kanban-update-story` | Mise à jour partielle (résultats TDD, AC, guide d'implémentation…) |
 | `kanban-move-story` | Déplacer une story vers une nouvelle colonne + log de la transition |
 | `kanban-create-story` | Créer une nouvelle story — toujours avec `status: pending` |
-| `kanban-get-next-pending` | Obtenir la prochaine story en attente (priorité la plus haute) |
+| `kanban-get-next-pending` | Obtenir la prochaine story en attente (`priority_score` d'abord, puis P0→P1→P2→phase) |
+| `kanban-bulk-prioritize` | Fixer les scores de priorité sur N stories en un seul appel |
 | `kanban-get-stats` | Obtenir les compteurs globaux du pipeline |
 
 Voir [`kanban/README.md`](kanban/README.md) pour le schéma complet, les règles de fusion et la référence du debug logging.
@@ -348,6 +436,8 @@ Chaque story est stockée dans `user-stories/us-X-Y.json` :
   "description": "...",        // rempli par /feature, /fix, /change ou /refine
   "status": "pending",
   "priority": "P0",            // P0 | P1 | P2
+  "order": 0,                  // position dans la colonne
+  "priority_score": 0,         // 0–100, défini par kanban-bulk-prioritize. Plus élevé = traité en premier
   "stack": ["backend"],        // rempli par /feature, /fix, /change ou /refine
   "acceptance_criteria": [
     {"id": 1, "text": "...", "checked": false}
@@ -357,9 +447,11 @@ Chaque story est stockée dans `user-stories/us-X-Y.json` :
   "implementation_guide": {},  // rempli par /refine
   "refine_decisions": [],      // rempli par /refine
   "secops_report": {},         // rempli par /secops (les deux modes)
-  "simplify_report": {},       // rempli par /simplify
+  "simplify_comments": "",     // rempli par /simplify
   "notes": "",
-  "history": []                // journal d'audit — append-only
+  "history": [],               // journal d'audit — append-only
+  "created_at": "2026-06-24T14:00:00",  // ISO datetime, géré par le serveur
+  "updated_at": "2026-06-24T14:00:00"   // ISO datetime, géré par le serveur
 }
 ```
 

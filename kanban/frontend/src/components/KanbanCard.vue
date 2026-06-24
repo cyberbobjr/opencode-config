@@ -51,7 +51,7 @@ function prioritySymbol(p) {
     <button
       v-if="TRIGGERABLE_STATUSES.has(story.status)"
       class="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded-md bg-slate-700 hover:bg-emerald-700 text-slate-400 hover:text-white"
-      title="Lancer la commande OpenCode"
+      title="Run OpenCode command"
       @click.stop="emit('trigger', story.id)"
     >
       <svg class="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">

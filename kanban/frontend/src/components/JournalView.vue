@@ -21,7 +21,7 @@ onMounted(async () => {
 function groupByDate(items) {
   const groups = {}
   for (const item of items) {
-    const date = item.ts?.slice(0, 10) ?? 'inconnu'
+    const date = item.ts?.slice(0, 10) ?? 'unknown'
     if (!groups[date]) groups[date] = []
     groups[date].push(item)
   }
@@ -34,17 +34,17 @@ function formatTime(ts) {
 }
 
 function formatDate(d) {
-  if (!d || d === 'inconnu') return 'Date inconnue'
+  if (!d || d === 'unknown') return 'Unknown date'
   const dt = new Date(d)
-  return dt.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
+  return dt.toLocaleDateString('en-US', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
 }
 </script>
 
 <template>
   <div class="max-w-3xl mx-auto py-6">
-    <p v-if="loading" class="text-slate-500 text-sm text-center py-8">Chargement…</p>
+    <p v-if="loading" class="text-slate-500 text-sm text-center py-8">Loading…</p>
     <p v-else-if="error" class="text-red-400 text-sm text-center py-8">{{ error }}</p>
-    <p v-else-if="!history.length" class="text-slate-500 text-sm text-center py-8">Aucun historique</p>
+    <p v-else-if="!history.length" class="text-slate-500 text-sm text-center py-8">No activity yet</p>
 
     <div v-else class="space-y-8">
       <div v-for="[date, entries] in groupByDate(history)" :key="date">
@@ -77,11 +77,11 @@ function formatDate(d) {
             <div class="flex-1 min-w-0">
               <div class="flex items-center gap-2 flex-wrap">
                 <span class="text-xs font-mono text-slate-400">{{ entry.story_id }}</span>
-                <span class="text-xs text-slate-300">{{ entry.action ?? 'mis à jour' }}</span>
+                <span class="text-xs text-slate-300">{{ entry.action ?? 'updated' }}</span>
                 <span v-if="entry.to" class="text-xs px-1.5 py-0.5 rounded" :style="{ backgroundColor: STATUS_COLORS[entry.to] + '25', color: STATUS_COLORS[entry.to] }">
                   → {{ STATUS_LABELS[entry.to] ?? entry.to }}
                 </span>
-                <span v-if="entry.actor" class="text-xs text-slate-600">par {{ entry.actor }}</span>
+                <span v-if="entry.actor" class="text-xs text-slate-600">by {{ entry.actor }}</span>
               </div>
             </div>
           </div>

@@ -40,7 +40,7 @@ async function fetchStories() {
   try {
     stories.value = await loadStories()
   } catch {
-    toast('Erreur chargement stories', 'error')
+    toast('Failed to load stories', 'error')
   }
 }
 
@@ -59,7 +59,7 @@ async function handleMove({ id, status }) {
     await fetchStories()
     toast(`→ ${STATUS_LABELS[status]}`)
   } catch {
-    toast('Erreur déplacement', 'error')
+    toast('Move failed', 'error')
     await fetchStories()
   }
 }
@@ -69,7 +69,7 @@ async function handleTrigger(id) {
     const result = await triggerStory(id)
     toast(`▶ ${result.command}`)
   } catch {
-    toast('Erreur déclenchement', 'error')
+    toast('Trigger failed', 'error')
   }
 }
 
@@ -85,10 +85,10 @@ async function handleSave({ id, changes }) {
   try {
     await updateStory(id, changes)
     await fetchStories()
-    toast('Sauvegardé')
+    toast('Saved')
     modalStoryId.value = null
   } catch {
-    toast('Erreur sauvegarde', 'error')
+    toast('Save failed', 'error')
   }
 }
 
@@ -97,23 +97,23 @@ async function handleDelete({ id }) {
     await deleteStory(id)
     modalStoryId.value = null
     await fetchStories()
-    toast('Story supprimée')
+    toast('Story deleted')
   } catch {
-    toast('Erreur suppression', 'error')
+    toast('Delete failed', 'error')
   }
 }
 
 async function handleCreate() {
   try {
     const story = await createStory({
-      title: 'Nouvelle story',
+      title: 'New story',
       status: 'pending',
       priority: 'medium',
     })
     await fetchStories()
     modalStoryId.value = story.id
   } catch {
-    toast('Erreur création', 'error')
+    toast('Creation failed', 'error')
   }
 }
 
@@ -151,7 +151,7 @@ onUnmounted(() => sse?.close())
         <input
           v-model="searchQuery"
           type="search"
-          placeholder="Rechercher…"
+          placeholder="Search…"
           class="bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-sm text-slate-200 placeholder:text-slate-600 focus:border-slate-500 focus:outline-none w-48"
         />
 
@@ -160,10 +160,10 @@ onUnmounted(() => sse?.close())
           <button
             v-for="view in [
               { id: 'kanban',  label: 'Kanban'   },
-              { id: 'simple',  label: 'Rapide'   },
+              { id: 'simple',  label: 'Simple'   },
               { id: 'focus',   label: 'Focus'    },
               { id: 'journal', label: 'Journal'  },
-              { id: 'list',    label: 'Liste'    },
+              { id: 'list',    label: 'List'     },
             ]"
             :key="view.id"
             class="text-xs px-3 py-1.5 rounded transition-colors"
