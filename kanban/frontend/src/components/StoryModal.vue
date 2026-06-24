@@ -1,30 +1,26 @@
 <script setup>
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import MarkdownContent from './MarkdownContent.vue'
-import SelectField from './SelectField.vue'
 import {
-  STACK_OPTIONS, STACK_COLORS, PRIORITY_OPTIONS, STATUS_OPTIONS,
+  STACK_OPTIONS, STACK_COLORS,
   STATUS_LABELS, STATUS_COLORS,
 } from '../constants.js'
 
 const props = defineProps({
-  story: { type: Object, required: true },
+  story:    { type: Object, required: true },
+  position: { type: Object, default: null },
 })
 const emit = defineEmits(['close', 'save', 'delete'])
 
 const activeTab = ref('spec')
 
-// Only user-editable fields
-const editData = ref({ priority: 'medium', stack: [] })
+const editData = ref({ stack: [] })
 
 watch(
   () => props.story,
   (s) => {
     if (!s) return
-    editData.value = {
-      priority: s.priority || 'medium',
-      stack:    [...(s.stack || [])],
-    }
+    editData.value = { stack: [...(s.stack || [])] }
   },
   { immediate: true }
 )
@@ -118,10 +114,7 @@ function toggleStack(tag) {
 function handleSave() {
   emit('save', {
     id: props.story.id,
-    changes: {
-      priority: editData.value.priority,
-      stack:    editData.value.stack,
-    },
+    changes: { stack: editData.value.stack },
   })
 }
 
@@ -143,7 +136,14 @@ function confirmDelete() {
       <!-- Header -->
       <div class="flex items-start justify-between gap-4 px-6 pt-5 pb-4 border-b border-slate-800">
         <div class="flex-1 min-w-0">
-          <span class="text-xs font-mono text-slate-500">{{ story.id }}</span>
+          <div class="flex items-center gap-2">
+            <span class="text-xs font-mono text-slate-500">{{ story.id }}</span>
+            <span
+              v-if="position"
+              class="text-xs text-slate-500"
+              title="Position in backlog"
+            >#{{ position.rank }} / {{ position.total }}</span>
+          </div>
           <h2 class="text-base font-semibold text-slate-100 mt-0.5">{{ story.title }}</h2>
         </div>
         <button
@@ -177,23 +177,17 @@ function confirmDelete() {
         <!-- ── Spec ──────────────────────────────────────────────── -->
         <template v-if="activeTab === 'spec'">
 
-          <!-- Priority (editable) + Status (read-only) -->
-          <div class="grid grid-cols-2 gap-4">
-            <div>
-              <label class="label">Priority <span class="text-primary ml-1">✎</span></label>
-              <SelectField v-model="editData.priority" :options="PRIORITY_OPTIONS" />
-            </div>
-            <div>
-              <label class="label">Status</label>
+          <!-- Status (read-only) -->
+          <div>
+            <label class="label">Status</label>
+            <div
+              class="flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-700 bg-slate-800/50"
+            >
               <div
-                class="flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-700 bg-slate-800/50"
-              >
-                <div
-                  class="w-2 h-2 rounded-full flex-shrink-0"
-                  :style="{ backgroundColor: STATUS_COLORS[story.status] }"
-                />
-                <span class="text-sm text-slate-300">{{ STATUS_LABELS[story.status] ?? story.status }}</span>
-              </div>
+                class="w-2 h-2 rounded-full flex-shrink-0"
+                :style="{ backgroundColor: STATUS_COLORS[story.status] }"
+              />
+              <span class="text-sm text-slate-300">{{ STATUS_LABELS[story.status] ?? story.status }}</span>
             </div>
           </div>
 

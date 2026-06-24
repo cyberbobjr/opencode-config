@@ -1,15 +1,11 @@
 <script setup>
-import { PRIORITY_COLORS, STACK_COLORS, STATUS_COLORS, STATUS_LABELS, TRIGGERABLE_STATUSES } from '../constants.js'
+import { STACK_COLORS, STATUS_COLORS, STATUS_LABELS, TRIGGERABLE_STATUSES } from '../constants.js'
 
 const props = defineProps({
   story: { type: Object, required: true },
   showStatus: { type: Boolean, default: false },
 })
 const emit = defineEmits(['click', 'trigger'])
-
-function prioritySymbol(p) {
-  return { low: '▽', medium: '◇', high: '△', critical: '★' }[p] ?? '◇'
-}
 </script>
 
 <template>
@@ -26,9 +22,6 @@ function prioritySymbol(p) {
           class="text-xs px-1.5 py-0.5 rounded font-medium"
           :style="{ backgroundColor: STATUS_COLORS[story.status] + '30', color: STATUS_COLORS[story.status] }"
         >{{ STATUS_LABELS[story.status] }}</span>
-        <span class="text-xs" :class="PRIORITY_COLORS[story.priority]">
-          {{ prioritySymbol(story.priority) }}
-        </span>
       </div>
     </div>
 

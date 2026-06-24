@@ -35,6 +35,14 @@ const modalStory = computed(() =>
   stories.value.find(s => s.id === modalStoryId.value) ?? null
 )
 
+const modalStoryPosition = computed(() => {
+  if (!modalStory.value || modalStory.value.status !== 'pending') return null
+  const pending = [...stories.value.filter(s => s.status === 'pending')]
+    .sort((a, b) => (b.priority_score ?? 0) - (a.priority_score ?? 0) || a.id.localeCompare(b.id))
+  const idx = pending.findIndex(s => s.id === modalStory.value.id)
+  return idx >= 0 ? { rank: idx + 1, total: pending.length } : null
+})
+
 // ── API helpers ───────────────────────────────────────────────────────
 async function fetchStories() {
   try {
@@ -247,6 +255,7 @@ onUnmounted(() => sse?.close())
     <StoryModal
       v-if="modalStory"
       :story="modalStory"
+      :position="modalStoryPosition"
       @close="modalStoryId = null"
       @save="handleSave"
       @delete="handleDelete"

@@ -1,6 +1,6 @@
 <script setup>
 import { ref, computed } from 'vue'
-import { STATUS_LABELS, STATUS_COLORS, PRIORITY_COLORS, STACK_COLORS } from '../constants.js'
+import { STATUS_LABELS, STATUS_COLORS, STACK_COLORS } from '../constants.js'
 
 const props = defineProps({
   stories: { type: Array, required: true },
@@ -19,30 +19,21 @@ function setSort(key) {
   }
 }
 
-const sorted = computed(() => {
-  const PRIORITY_ORDER = { critical: 0, high: 1, medium: 2, low: 3 }
-  return [...props.stories].sort((a, b) => {
+const sorted = computed(() =>
+  [...props.stories].sort((a, b) => {
     let av = a[sortKey.value]
     let bv = b[sortKey.value]
-    if (sortKey.value === 'priority') {
-      av = PRIORITY_ORDER[av] ?? 99
-      bv = PRIORITY_ORDER[bv] ?? 99
-    }
     if (av === undefined) av = ''
     if (bv === undefined) bv = ''
     if (av < bv) return -sortDir.value
     if (av > bv) return sortDir.value
     return 0
   })
-})
+)
 
 function sortIcon(key) {
   if (sortKey.value !== key) return '↕'
   return sortDir.value === 1 ? '↑' : '↓'
-}
-
-function priorityLabel(p) {
-  return { low: 'Low', medium: 'Med.', high: 'High', critical: 'Crit.' }[p] ?? p
 }
 </script>
 
@@ -56,7 +47,6 @@ function priorityLabel(p) {
               { key: 'id', label: 'ID' },
               { key: 'title', label: 'Title' },
               { key: 'status', label: 'Status' },
-              { key: 'priority', label: 'Priority' },
               { key: 'stack', label: 'Stack' },
             ]"
             :key="col.key"
@@ -82,11 +72,6 @@ function priorityLabel(p) {
               :style="{ backgroundColor: STATUS_COLORS[s.status] + '25', color: STATUS_COLORS[s.status] }"
             >
               {{ STATUS_LABELS[s.status] }}
-            </span>
-          </td>
-          <td class="px-3 py-2 whitespace-nowrap">
-            <span class="text-xs font-medium" :class="PRIORITY_COLORS[s.priority]">
-              {{ priorityLabel(s.priority) }}
             </span>
           </td>
           <td class="px-3 py-2">

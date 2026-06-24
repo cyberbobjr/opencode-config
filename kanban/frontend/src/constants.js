@@ -66,20 +66,6 @@ export const STACK_COLORS = {
   devops:         '#6b7280',
 }
 
-export const PRIORITY_OPTIONS = [
-  { value: 'low',      label: 'Low',      color: '#60a5fa' },
-  { value: 'medium',   label: 'Medium',   color: '#fbbf24' },
-  { value: 'high',     label: 'High',     color: '#fb923c' },
-  { value: 'critical', label: 'Critical', color: '#f87171' },
-]
-
-export const PRIORITY_COLORS = {
-  low:      'text-blue-400',
-  medium:   'text-yellow-400',
-  high:     'text-orange-400',
-  critical: 'text-red-400',
-}
-
 export const STATUS_OPTIONS = Object.entries(STATUS_LABELS).map(([value, label]) => ({
   value, label, color: STATUS_COLORS[value],
 }))

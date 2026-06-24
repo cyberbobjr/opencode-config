@@ -387,7 +387,6 @@ def api_update(sid: str, body: dict, no_trigger: bool = False):
 @rest.post("/api/stories")
 def api_create(body: dict):
     title = body.get("title", "New Story")
-    priority = body.get("priority", "P2")
     phase = body.get("phase", 7)
 
     existing = load_all()
@@ -407,7 +406,7 @@ def api_create(body: dict):
     next_order = max((s.get("order", 0) for s in existing if s.get("status") == "pending"), default=-1) + 1
     story = {
         "id": sid, "phase": phase, "phase_name": phase_names.get(phase, "Backlog"),
-        "title": title, "description": "", "priority": priority, "status": "pending",
+        "title": title, "description": "", "status": "pending",
         "order": next_order, "priority_score": 0,
         "acceptance_criteria": [],
         "stack": [],
@@ -669,9 +668,9 @@ def move_story(story_id: str, new_status: str, actor: str = "agent") -> str:
 
 
 @mcp.tool()
-def create_story(title: str, priority: str = "P2", phase: int = 7) -> str:
+def create_story(title: str, phase: int = 7) -> str:
     """Create a new story. Returns the created story as JSON."""
-    _mcp_debug("create_story", "in", title=title, priority=priority, phase=phase)
+    _mcp_debug("create_story", "in", title=title, phase=phase)
     existing = load_all()
     phase_items = [s for s in existing if s.get("phase") == phase]
     nums = []
@@ -689,7 +688,7 @@ def create_story(title: str, priority: str = "P2", phase: int = 7) -> str:
     next_order = max((s.get("order", 0) for s in existing if s.get("status") == "pending"), default=-1) + 1
     story = {
         "id": sid, "phase": phase, "phase_name": phase_names.get(phase, "Backlog"),
-        "title": title, "description": "", "priority": priority, "status": "pending",
+        "title": title, "description": "", "status": "pending",
         "order": next_order, "priority_score": 0,
         "acceptance_criteria": [],
         "stack": [],
@@ -700,7 +699,7 @@ def create_story(title: str, priority: str = "P2", phase: int = 7) -> str:
         "created_at": now, "updated_at": now,
     }
     save_one(sid, story)
-    _mcp_debug("create_story", "out", id=sid, phase=phase, priority=priority)
+    _mcp_debug("create_story", "out", id=sid, phase=phase)
     return json.dumps(story, ensure_ascii=False)
 
 
@@ -709,10 +708,8 @@ def get_next_pending() -> str:
     """Get the next pending story (P0 first, earliest phase)."""
     _mcp_debug("get_next_pending", "in")
     items = [s for s in load_all() if s.get("status") == "pending" and s.get("phase") != 6]
-    prio = {"P0": 0, "P1": 1, "P2": 2, "Future": 3}
     items.sort(key=lambda s: (
         -s.get("priority_score", 0),
-        prio.get(s.get("priority", "P2"), 3),
         s.get("phase", 99),
         s["id"],
     ))
@@ -722,7 +719,6 @@ def get_next_pending() -> str:
     next_s = items[0]
     _mcp_debug("get_next_pending", "out",
         story_id=next_s["id"],
-        priority=next_s.get("priority"),
         phase=next_s.get("phase"),
         pending_total=len(items),
     )
