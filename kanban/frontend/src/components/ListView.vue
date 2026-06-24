@@ -7,6 +7,10 @@ const props = defineProps({
 })
 const emit = defineEmits(['open-modal'])
 
+const STATUS_ORDER = Object.fromEntries(
+  Object.keys(STATUS_LABELS).map((k, i) => [k, i])
+)
+
 const sortKey = ref('id')
 const sortDir = ref(1)
 
@@ -21,10 +25,12 @@ function setSort(key) {
 
 const sorted = computed(() =>
   [...props.stories].sort((a, b) => {
-    let av = a[sortKey.value]
-    let bv = b[sortKey.value]
-    if (av === undefined) av = ''
-    if (bv === undefined) bv = ''
+    let av = sortKey.value === 'status'
+      ? (STATUS_ORDER[a.status] ?? 99)
+      : (a[sortKey.value] ?? '')
+    let bv = sortKey.value === 'status'
+      ? (STATUS_ORDER[b.status] ?? 99)
+      : (b[sortKey.value] ?? '')
     if (av < bv) return -sortDir.value
     if (av > bv) return sortDir.value
     return 0
@@ -35,6 +41,11 @@ function sortIcon(key) {
   if (sortKey.value !== key) return '↕'
   return sortDir.value === 1 ? '↑' : '↓'
 }
+
+function formatTs(ts) {
+  if (!ts) return '—'
+  return ts.replace('T', ' ').slice(0, 16)
+}
 </script>
 
 <template>
@@ -44,16 +55,19 @@ function sortIcon(key) {
         <tr class="border-b border-slate-700">
           <th
             v-for="col in [
-              { key: 'id', label: 'ID' },
-              { key: 'title', label: 'Title' },
-              { key: 'status', label: 'Status' },
-              { key: 'stack', label: 'Stack' },
+              { key: 'id',         label: 'ID',      sortable: true  },
+              { key: 'title',      label: 'Title',   sortable: true  },
+              { key: 'status',     label: 'Status',  sortable: true  },
+              { key: 'updated_at', label: 'Updated', sortable: true  },
+              { key: 'stack',      label: 'Stack',   sortable: false },
             ]"
             :key="col.key"
-            class="text-left px-3 py-2 text-xs font-semibold text-slate-500 uppercase tracking-wider cursor-pointer hover:text-slate-300 whitespace-nowrap"
-            @click="setSort(col.key)"
+            class="text-left px-3 py-2 text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap"
+            :class="col.sortable ? 'cursor-pointer hover:text-slate-300' : ''"
+            @click="col.sortable && setSort(col.key)"
           >
-            {{ col.label }} <span class="text-slate-600">{{ sortIcon(col.key) }}</span>
+            {{ col.label }}
+            <span v-if="col.sortable" class="text-slate-600">{{ sortIcon(col.key) }}</span>
           </th>
         </tr>
       </thead>
@@ -74,6 +88,7 @@ function sortIcon(key) {
               {{ STATUS_LABELS[s.status] }}
             </span>
           </td>
+          <td class="px-3 py-2 font-mono text-xs text-slate-500 whitespace-nowrap">{{ formatTs(s.updated_at) }}</td>
           <td class="px-3 py-2">
             <div class="flex gap-1 flex-wrap">
               <span
