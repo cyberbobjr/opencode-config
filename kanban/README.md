@@ -232,6 +232,32 @@ Returns `{"message": "ALL_DONE"}` if no stories are pending.
 
 ---
 
+### `kanban-bulk-prioritize`
+
+Sets priority scores on multiple stories in one atomic call.
+
+```
+scores  str   JSON array of {"id", "score" (0–100), "rationale" (optional)}
+```
+
+- **Higher score = picked first** by `kanban-get-next-pending`, overriding the default P0→P1→P2 sort.
+- **Score 0** means no special priority — falls back to the default P0→P1→P2→phase order.
+- Each score change is logged in the story's `history` with the rationale.
+
+```jsonc
+// Example: set a custom processing order for pending stories
+kanban-bulk-prioritize('[
+  {"id": "US 2.3", "score": 90, "rationale": "blocking 3 other stories"},
+  {"id": "US 1.7", "score": 75, "rationale": "security fix, P0 risk"},
+  {"id": "US 3.1", "score": 10, "rationale": "nice-to-have, deferred"}
+]')
+// Returns: {"ok": true, "count": 3, "order": [{id, score, rationale}, ...] sorted desc}
+```
+
+To reset all scores (restore default ordering), set every story's score back to 0.
+
+---
+
 ### `kanban-get-stats`
 
 Returns global project statistics.
@@ -288,6 +314,7 @@ The `?no_trigger=1` parameter on `PATCH` disables the OpenCode bridge for that c
   "priority":     "P0 | P1 | P2 | Future",
   "status":       "pending | refining | secops_tm | tdd | secops_cr | qa | simplify | commit_ready | completed | blocked",
   "order":        0,               // position within the column
+  "priority_score": 0,            // 0–100, set by kanban-bulk-prioritize. Higher = processed first.
   "stack":        ["backend", "database"],  // impacted domains
   "acceptance_criteria": [
     {"id": 1, "text": "...", "checked": false}
@@ -353,6 +380,7 @@ Every call to `kanban-update-story` or `kanban-move-story` automatically produce
 | `/qa` agent | `qa` |
 | `/next-story simplify` agent | `simplify` |
 | `/next-story commit` agent | `commit` |
+| `kanban-bulk-prioritize` | `prioritize` |
 | MCP call without `_actor` | `agent` |
 
 History is displayed in the dashboard edit modal (read-only, last 15 entries).

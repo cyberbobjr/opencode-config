@@ -315,6 +315,8 @@ def _compute_diff(old: dict, new: dict) -> list[str]:
             changes.append("secops_report modifié")
         elif key == "stack":
             changes.append(f"stack: {nv}")
+        elif key == "priority_score":
+            changes.append(f"priority_score: {ov} → {nv}")
         elif key in ("description", "title", "notes", "simplify_comments"):
             changes.append(f"{key} modifié")
         else:
@@ -406,7 +408,7 @@ def api_create(body: dict):
     story = {
         "id": sid, "phase": phase, "phase_name": phase_names.get(phase, "Backlog"),
         "title": title, "description": "", "priority": priority, "status": "pending",
-        "order": next_order,
+        "order": next_order, "priority_score": 0,
         "acceptance_criteria": [],
         "stack": [],
         "tdd": {"status": "pending", "tests": 0, "coverage": "0%", "notes": ""},
@@ -688,7 +690,7 @@ def create_story(title: str, priority: str = "P2", phase: int = 7) -> str:
     story = {
         "id": sid, "phase": phase, "phase_name": phase_names.get(phase, "Backlog"),
         "title": title, "description": "", "priority": priority, "status": "pending",
-        "order": next_order,
+        "order": next_order, "priority_score": 0,
         "acceptance_criteria": [],
         "stack": [],
         "tdd": {"status": "pending", "tests": 0, "coverage": "0%", "notes": ""},
@@ -708,7 +710,12 @@ def get_next_pending() -> str:
     _mcp_debug("get_next_pending", "in")
     items = [s for s in load_all() if s.get("status") == "pending" and s.get("phase") != 6]
     prio = {"P0": 0, "P1": 1, "P2": 2, "Future": 3}
-    items.sort(key=lambda s: (prio.get(s.get("priority", "P2"), 3), s.get("phase", 99), s["id"]))
+    items.sort(key=lambda s: (
+        -s.get("priority_score", 0),
+        prio.get(s.get("priority", "P2"), 3),
+        s.get("phase", 99),
+        s["id"],
+    ))
     if not items:
         _mcp_debug("get_next_pending", "out", result="ALL_DONE")
         return json.dumps({"message": "ALL_DONE"})
@@ -720,6 +727,51 @@ def get_next_pending() -> str:
         pending_total=len(items),
     )
     return json.dumps(next_s, ensure_ascii=False)
+
+
+@mcp.tool()
+def bulk_prioritize(scores: str) -> str:
+    """Set priority scores on multiple stories in one atomic call.
+    scores: JSON array of {"id": "US X.Y", "score": 0-100, "rationale": "..."}.
+    Higher score = picked first by get_next_pending (overrides P0/P1/P2 ordering).
+    Score 0 means no special priority — falls back to the default P0→P1→P2 sort.
+    Returns the updated stories sorted by descending score."""
+    try:
+        items = json.loads(scores)
+    except json.JSONDecodeError as e:
+        _mcp_debug("bulk_prioritize", "in", parse_error=str(e))
+        return json.dumps({"error": f"Invalid JSON: {e}"})
+
+    _mcp_debug("bulk_prioritize", "in", count=len(items))
+    updated = []
+    for item in items:
+        sid = item.get("id")
+        score = int(item.get("score", 0))
+        rationale = item.get("rationale", "")
+        if not sid:
+            continue
+        s = load_one(sid)
+        if not s:
+            continue
+        old_score = s.get("priority_score", 0)
+        s["priority_score"] = score
+        if old_score != score:
+            change = f"priority_score: {old_score} → {score}"
+            if rationale:
+                change += f" — {rationale}"
+            s.setdefault("history", []).append({
+                "ts": datetime.now().isoformat(timespec="seconds"),
+                "by": "prioritize",
+                "changes": [change],
+            })
+        save_one(sid, s)
+        updated.append({"id": sid, "score": score, "rationale": rationale})
+
+    updated.sort(key=lambda x: -x["score"])
+    _mcp_debug("bulk_prioritize", "out", count=len(updated),
+        top=updated[0]["id"] if updated else None,
+    )
+    return json.dumps({"ok": True, "count": len(updated), "order": updated}, ensure_ascii=False)
 
 
 @mcp.tool()
