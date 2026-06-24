@@ -81,16 +81,22 @@ def _mcp_debug(tool: str, direction: str, **fields) -> None:
     log.debug(f"[MCP] {arrow} {tool}{suffix}")
 
 
-# ── SSE version counter ──────────────────────────────────────────────
-_story_version = 0
-_story_version_lock = threading.Lock()
+# ── Shared version counter (file-based, visible across processes) ─────
+_version_lock = threading.Lock()
 
 
-def bump_version():
-    global _story_version
-    with _story_version_lock:
-        _story_version += 1
-        return _story_version
+def _read_version() -> int:
+    try:
+        return int(VERSION_FILE.read_text().strip())
+    except (FileNotFoundError, ValueError):
+        return 0
+
+
+def bump_version() -> int:
+    with _version_lock:
+        v = _read_version() + 1
+        VERSION_FILE.write_text(str(v))
+        return v
 
 
 # ── Story cache ──────────────────────────────────────────────────────
@@ -196,22 +202,24 @@ def find_stories_dir() -> Path:
 
 
 STORIES_DIR = find_stories_dir()
+VERSION_FILE = STORIES_DIR.parent / ".kanban-version"
 
 
 def load_all() -> list[dict]:
+    current_ver   = _read_version()
     current_mtime = _disk_mtime()
     with _cache_lock:
         if (
-            _story_cache["ver"] == _story_version
+            _story_cache["ver"] == current_ver
             and _story_cache["mtime"] == current_mtime
             and _story_cache["data"]
         ):
             return copy.deepcopy(_story_cache["data"])
     data = _load_from_disk()
     with _cache_lock:
-        _story_cache["ver"] = _story_version
+        _story_cache["ver"]   = current_ver
         _story_cache["mtime"] = current_mtime
-        _story_cache["data"] = data
+        _story_cache["data"]  = data
     return copy.deepcopy(data)
 
 
@@ -528,37 +536,36 @@ def api_reorder(body: dict):
 
 @rest.get("/api/events")
 async def api_events():
-    last = _story_version
-    ticks_since_ping = 0  # send a keepalive comment every 15s (30 × 0.5s)
+    last      = _read_version()
+    last_mtime = _disk_mtime()
+    ticks_since_ping = 0
+    mtime_ticks      = 0
 
     async def event_gen():
-        nonlocal last, ticks_since_ping
-        last_mtime = _disk_mtime()
+        nonlocal last, last_mtime, ticks_since_ping, mtime_ticks
         yield f"data: refresh\n\n"  # immediate sync on connect/reconnect
-        mtime_ticks = 0
         while True:
             await asyncio.sleep(0.5)
             ticks_since_ping += 1
-            mtime_ticks += 1
-            v = _story_version
+            mtime_ticks      += 1
+            v = _read_version()
             if v != last:
-                last = v
+                # version bumped by any process via bump_version()
+                last       = v
                 last_mtime = _disk_mtime()
-                ticks_since_ping = 0
-                mtime_ticks = 0
+                ticks_since_ping = mtime_ticks = 0
                 yield f"data: refresh\n\n"
-            elif mtime_ticks >= 10:  # check disk every 5 s for direct file edits
+            elif mtime_ticks >= 10:  # fallback: catch direct file edits every 5 s
                 mtime_ticks = 0
                 m = _disk_mtime()
                 if m != last_mtime:
                     last_mtime = m
-                    bump_version()  # sync in-process version with disk reality
-                    last = _story_version
+                    last = bump_version()   # align version file with disk reality
                     ticks_since_ping = 0
                     yield f"data: refresh\n\n"
             elif ticks_since_ping >= 30:
                 ticks_since_ping = 0
-                yield ": ping\n\n"  # SSE comment — keeps the connection alive
+                yield ": ping\n\n"  # keepalive
 
     return StreamingResponse(event_gen(), media_type="text/event-stream", headers={
         "Cache-Control": "no-cache",
