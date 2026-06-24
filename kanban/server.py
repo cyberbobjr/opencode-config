@@ -2,8 +2,12 @@
 """Kanban story server — REST API + MCP tools + Dashboard.
 
 Usage:
-  python .opencode/kanban/server.py          → HTTP (dashboard on :8765)
-  python .opencode/kanban/server.py --mcp    → MCP stdio + background HTTP
+  python .opencode/kanban/server.py          → HTTP only (dashboard on KANBAN_HTTP_PORT, default 8765)
+  python .opencode/kanban/server.py --mcp    → MCP stdio + background HTTP (started by OpenCode)
+
+Ports (override via .opencode/.env or env vars):
+  KANBAN_HTTP_PORT=8765   — dashboard / REST API port
+  OPENCODE_PORT=4096      — OpenCode TUI bridge port (or set OPENCODE_SERVER_URL directly)
 """
 
 import os
@@ -19,6 +23,27 @@ from urllib.request import Request, urlopen
 
 HERE = Path(__file__).resolve().parent
 LOG_FILE = HERE / "kanban.log"
+
+
+def _load_dotenv(path: Path) -> None:
+    """Load key=value pairs from a .env file without overwriting existing env vars."""
+    if not path.exists():
+        return
+    for raw in path.read_text().splitlines():
+        line = raw.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        k, _, v = line.partition("=")
+        os.environ.setdefault(k.strip(), v.strip().strip('"').strip("'"))
+
+
+# Load .opencode/.env when present (HERE = .opencode/kanban/ → parent = .opencode/)
+_load_dotenv(HERE.parent / ".env")
+
+# ── Configurable ports ───────────────────────────────────────────────
+# Override via .opencode/.env or environment variables before launch.
+KANBAN_HTTP_PORT: int = int(os.environ.get("KANBAN_HTTP_PORT", "8765"))
+OPENCODE_PORT: int = int(os.environ.get("OPENCODE_PORT", "4096"))
 
 # ── Debug flag (env var or --debug CLI argument) ─────────────────────
 # Enable with: KANBAN_DEBUG=1 python server.py --mcp
@@ -88,7 +113,7 @@ _version_lock = threading.Lock()
 def _read_version() -> int:
     try:
         return int(VERSION_FILE.read_text().strip())
-    except (FileNotFoundError, ValueError):
+    except Exception:
         return 0
 
 
@@ -125,7 +150,7 @@ def _load_from_disk() -> list[dict]:
 
 
 # ── OpenCode HTTP Bridge ─────────────────────────────────────────────
-OPENCODE_SERVER_URL = os.environ.get("OPENCODE_SERVER_URL", "http://localhost:4096")
+OPENCODE_SERVER_URL = os.environ.get("OPENCODE_SERVER_URL", f"http://localhost:{OPENCODE_PORT}")
 OPENCODE_TRIGGER_ENABLED = os.environ.get("OPENCODE_TRIGGER_ENABLED", "1") == "1"
 
 
@@ -807,13 +832,13 @@ def run_http():
     log.info("═══ Kanban Server ═══")
     log.info(f"  Stories : {STORIES_DIR}")
     log.info(f"  Count   : {len(load_all())}")
-    log.info(f"  REST    : http://localhost:8765/api/stories")
-    log.info(f"  Dashboard: http://localhost:8765/")
+    log.info(f"  REST    : http://localhost:{KANBAN_HTTP_PORT}/api/stories")
+    log.info(f"  Dashboard: http://localhost:{KANBAN_HTTP_PORT}/")
     log.info(f"  OpenCode bridge: {'ON → ' + OPENCODE_SERVER_URL if OPENCODE_TRIGGER_ENABLED else 'OFF'}")
     log.info(f"  Debug mode: {'ON — MCP calls logged to stderr + {LOG_FILE.name}' if KANBAN_DEBUG else 'OFF (set KANBAN_DEBUG=1 or --debug to enable)'}")
 
     import uvicorn
-    uvicorn.run(rest, host="0.0.0.0", port=8765, log_level="warning")
+    uvicorn.run(rest, host="0.0.0.0", port=KANBAN_HTTP_PORT, log_level="warning")
 
 
 def run_mcp():

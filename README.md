@@ -6,6 +6,20 @@ At its core: a Kanban server that works simultaneously as a **web dashboard**, a
 
 ---
 
+> [!CAUTION]
+> ## ⛔ MANDATORY — OpenCode must be launched with `--port 4096`
+>
+> The Kanban → OpenCode bridge (command injection on card drag) talks to OpenCode's HTTP API.  
+> **Without `--port 4096`, the dashboard cannot drive the agent.**
+>
+> ```bash
+> opencode --port 4096
+> ```
+>
+> The port is configurable via `OPENCODE_PORT` in `.opencode/.env` (see [Port configuration](#port-configuration)).
+
+---
+
 ## What this gives you
 
 - **A Kanban board** connected to your agent via MCP — stories move through columns as the agent works
@@ -23,6 +37,8 @@ At its core: a Kanban server that works simultaneously as a **web dashboard**, a
 .opencode/
 ├── opencode.json          — MCP server configuration (consumed by OpenCode)
 ├── package.json           — Node dependencies (optional tooling)
+├── .env.example           — Port configuration template (copy to .env to customize)
+├── .env                   — Local port overrides (gitignored, never commit)
 │
 ├── commands/              — Slash commands (prompts injected into OpenCode's main agent)
 │   ├── next-story.md      — Workflow coordinator: full cycle or individual steps
@@ -103,19 +119,16 @@ npm run dev   # Vite dev server at http://localhost:5173
 
 ### 3. Start the Kanban server
 
-OpenCode automatically starts the server via MCP. You can also run it manually:
+**Never launch the server manually.** OpenCode starts it automatically as an MCP subprocess. A manually-launched process becomes orphaned (PPID=1) and survives OpenCode restarts, running stale code.
 
+OpenCode launches:
 ```bash
-# Dashboard + MCP (standard mode)
-python .opencode/kanban/server.py --mcp
-
-# Debug mode — logs every MCP call with parameters
 python .opencode/kanban/server.py --mcp --debug
 ```
 
-Dashboard: `http://localhost:8765`
+This single process handles both the MCP transport (stdio) and the HTTP server (port `KANBAN_HTTP_PORT`, default 8765) simultaneously. **Dashboard: `http://localhost:8765`**
 
-> **Important**: let OpenCode start the server — it binds both MCP (stdio) and HTTP (port 8765) in the same process. Running a second instance creates two separate processes with desynchronized state.
+To restart the server: quit and relaunch OpenCode.
 
 ### 4. Configure OpenCode
 
@@ -136,7 +149,25 @@ The `opencode.json` at the root of this repo already wires the Kanban server as 
 
 Copy it to your project root (or merge with your existing `opencode.json`).
 
-### 5. Add your project conventions
+### 5. Port configuration
+
+Copy `.opencode/.env.example` to `.opencode/.env` and adjust:
+
+```bash
+cp .opencode/.env.example .opencode/.env
+```
+
+```bash
+# .opencode/.env
+KANBAN_HTTP_PORT=8765   # dashboard / REST API port
+OPENCODE_PORT=4096      # must match --port passed to opencode
+```
+
+The `.opencode/.env` file is loaded at server startup. Shell environment variables take precedence over the file.
+
+> ⚠️ **`.opencode/.env` is gitignored** (covered by the root `.env` rule). Never commit it.
+
+### 6. Add your project conventions
 
 Commands reference `AGENTS.md` at the project root for stack-specific details (test runner, lint commands, file paths, design system). Create one if you don't have it — see the [AGENTS.md template](#agentsmd-template) section below.
 
@@ -219,7 +250,7 @@ The dashboard at `http://localhost:8765` has five views, toggled from the header
 | **Rapide** | `Rapide` | 5 meta-columns (Backlog / En cours / Validation / Prêt / Terminé). A cross-column drop moves the story to the default target status of the destination group. |
 | **Focus** | `Focus` | Shows the active story (most recently moved, non-pending/done) as a pipeline progress bar with each step highlighted. Useful for monitoring a story currently being processed. |
 | **Journal** | `Journal` | Global activity timeline — all history entries from all stories, grouped by date, in reverse-chronological order. |
-| **Liste** | `Liste` | Sortable table of all stories (ID, title, status, priority, stack). |
+| **List** | `List` | Sortable table of all stories (ID, title, status, last updated, stack) with filter chips by status and by stack. Status sort follows pipeline order. |
 
 Every view shares the same search bar (filters by ID, title, or stack tag) and opens the same edit modal on click.
 
@@ -255,7 +286,7 @@ The modal has four tabs:
 
 | Tab | Content | Editable? |
 |-----|---------|-----------|
-| **Spécification** | Title, priority, status, stack tags, description, acceptance criteria | ✅ |
+| **Specification** | Title, status, stack tags, description, acceptance criteria. Pending stories show their backlog position (#n / total). | ✅ |
 | **Raffinement** | Refinement decisions, implementation guide | Read-only (agent-generated, rendered as Markdown) |
 | **Avancement** | Notes, TDD section (status / tests / coverage / summary), QA section, SecOps report, Simplify summary | Mixed — notes editable, agent reports read-only |
 | **Historique** | Append-only audit trail for this story | Read-only |
@@ -376,7 +407,6 @@ All commands are stack-agnostic. They reference `AGENTS.md` in your project root
 |-------|------|
 | `title` | Normalized, ≤60 chars, type-specific format (see below) |
 | `description` | Type-specific template (see below) |
-| `priority` | P1 for bugs, P2 for features/changes — adjustable |
 | `stack` | Inferred from codebase scan — always filled |
 | `notes` | Reproduction context, impacted stories, open questions |
 
@@ -449,9 +479,8 @@ Each story is stored as `user-stories/us-X-Y.json`:
   "title": "...",
   "description": "...",       // filled by /feature, /fix, /change or /refine
   "status": "pending",
-  "priority": "P0",           // P0 | P1 | P2
-  "order": 0,                 // position within the column
-  "priority_score": 0,        // 0–100, set by kanban-bulk-prioritize. Higher = processed first.
+  "order": 0,                 // position within the column (drag-and-drop order)
+  "priority_score": 0,        // 0–100, set by kanban-bulk-prioritize. Higher = processed first in backlog.
   "stack": ["backend"],       // filled by /feature, /fix, /change or /refine
   "acceptance_criteria": [
     {"id": 1, "text": "...", "checked": false}
