@@ -83,6 +83,7 @@ const ACTOR_COLORS = {
   qa:          '#ec4899',
   simplify:    '#14b8a6',
   commit:      '#10b981',
+  prioritize:  '#f97316',
   agent:       '#6b7280',
   user:        '#60a5fa',
 }
@@ -387,6 +388,17 @@ function confirmDelete() {
 
         <!-- ── Historique ─────────────────────────────────────────── -->
         <template v-else-if="activeTab === 'history'">
+
+          <!-- Timestamps -->
+          <div class="flex gap-6 text-xs text-slate-500 pb-1 border-b border-slate-800 mb-1">
+            <span v-if="story.created_at">
+              Créée le <span class="text-slate-400 font-mono">{{ formatTs(story.created_at) }}</span>
+            </span>
+            <span v-if="story.updated_at">
+              Mise à jour <span class="text-slate-400 font-mono">{{ formatTs(story.updated_at) }}</span>
+            </span>
+          </div>
+
           <p v-if="!storyHistory.length" class="text-slate-500 text-sm italic">Pas d'historique.</p>
 
           <div v-else class="space-y-3">

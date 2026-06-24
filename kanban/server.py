@@ -223,7 +223,7 @@ def load_one(story_id: str) -> dict | None:
 
 
 def save_one(story_id: str, data: dict):
-    data["updated_at"] = str(date.today())
+    data["updated_at"] = datetime.now().isoformat(timespec="seconds")
     for f in STORIES_DIR.glob("*.json"):
         try:
             if json.loads(f.read_text())["id"] == story_id:
@@ -280,8 +280,8 @@ def story_file(story_id: str) -> Path | None:
 
 def merge_dict(base: dict, update: dict) -> dict:
     for k, v in update.items():
-        if k in ("history", "_actor"):
-            continue  # history is append-only; _actor is stripped before merge
+        if k in ("history", "_actor", "created_at", "updated_at"):
+            continue  # server-managed fields — agents must not override them
         if k in ("tdd", "qa", "secops_report") and isinstance(v, dict):
             base.setdefault(k, {}).update(v)
         elif k in ("acceptance_criteria", "refine_decisions", "stack") and isinstance(v, list):
@@ -292,7 +292,7 @@ def merge_dict(base: dict, update: dict) -> dict:
 
 
 def _compute_diff(old: dict, new: dict) -> list[str]:
-    skip = {"updated_at", "history", "_actor"}
+    skip = {"updated_at", "created_at", "history", "_actor"}
     changes = []
     keys = (set(old.keys()) | set(new.keys())) - skip
     for key in sorted(keys):
@@ -403,7 +403,7 @@ def api_create(body: dict):
 
     phase_names = {1: "Fondations Backend", 2: "Frontend MVP", 3: "SaaS & Monétisation",
                    4: "Mode Entreprise", 5: "Quality & Hardening", 6: "V2 & Futur", 7: "Backlog"}
-    now = str(date.today())
+    now = datetime.now().isoformat(timespec="seconds")
     next_order = max((s.get("order", 0) for s in existing if s.get("status") == "pending"), default=-1) + 1
     story = {
         "id": sid, "phase": phase, "phase_name": phase_names.get(phase, "Backlog"),
@@ -685,7 +685,7 @@ def create_story(title: str, priority: str = "P2", phase: int = 7) -> str:
 
     phase_names = {1: "Fondations Backend", 2: "Frontend MVP", 3: "SaaS & Monétisation",
                    4: "Mode Entreprise", 5: "Quality & Hardening", 6: "V2 & Futur", 7: "Backlog"}
-    now = str(date.today())
+    now = datetime.now().isoformat(timespec="seconds")
     next_order = max((s.get("order", 0) for s in existing if s.get("status") == "pending"), default=-1) + 1
     story = {
         "id": sid, "phase": phase, "phase_name": phase_names.get(phase, "Backlog"),
