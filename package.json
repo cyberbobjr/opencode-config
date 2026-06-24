@@ -1,4 +1,8 @@
 {
+  "scripts": {
+    "dashboard:build": "cd kanban/frontend && npm run build",
+    "dashboard:dev": "cd kanban/frontend && npm run dev"
+  },
   "dependencies": {
     "@opencode-ai/plugin": "1.17.8"
   }
