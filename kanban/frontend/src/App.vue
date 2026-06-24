@@ -12,7 +12,7 @@ import StoryModal from './components/StoryModal.vue'
 
 // ── State ─────────────────────────────────────────────────────────────
 const stories       = ref([])
-const currentView   = ref('kanban')
+const currentView   = ref(localStorage.getItem('kanban-view') ?? 'kanban')
 const modalStoryId  = ref(null)
 const searchQuery   = ref('')
 const autoTrigger   = ref(localStorage.getItem('kanban-auto-trigger') !== 'false')
@@ -116,6 +116,8 @@ async function handleCreate() {
     toast('Creation failed', 'error')
   }
 }
+
+watch(currentView, (v) => localStorage.setItem('kanban-view', v))
 
 function toggleAutoTrigger() {
   autoTrigger.value = !autoTrigger.value
