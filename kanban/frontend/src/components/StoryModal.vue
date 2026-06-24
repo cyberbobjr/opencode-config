@@ -56,11 +56,13 @@ const refinementDecisions = computed(() =>
   (props.story.refine_decisions || []).map(normalizeDecision).filter(Boolean)
 )
 const implGuide   = computed(() => props.story.implementation_guide || null)
-const secopsNotes = computed(() =>
-  props.story.secops_report?.notes ||
-  props.story.secops_report?.note  ||
-  props.story.secops_report?.comments || ''
-)
+const secopsReport = computed(() => {
+  const r = props.story.secops_report
+  if (!r || typeof r !== 'object' || Array.isArray(r)) return null
+  const hasContent = r.mode || r.surfaces?.length || r.risks?.length ||
+                     r.recommendations?.length || r.status || r.notes || r.issues?.length
+  return hasContent ? r : null
+})
 const simplifyComments = computed(() => props.story.simplify_comments || '')
 const simplifyDone = computed(() =>
   !simplifyComments.value &&
@@ -355,11 +357,70 @@ function confirmDelete() {
             </div>
           </div>
 
-          <!-- SecOps CR (read-only) -->
-          <div v-if="secopsNotes">
-            <label class="label">SecOps CR — Report</label>
-            <div class="bg-slate-800/60 rounded-lg p-4 border border-slate-700">
-              <MarkdownContent :content="secopsNotes" />
+          <!-- SecOps Report (read-only) -->
+          <div v-if="secopsReport">
+            <label class="label">
+              SecOps —
+              <span class="font-normal text-slate-500">{{ secopsReport.mode === 'threat-model' ? 'Threat Model' : 'Code Review' }}</span>
+              <span
+                v-if="secopsReport.review_required != null || secopsReport.status"
+                class="ml-2 text-xs px-1.5 py-0.5 rounded font-medium"
+                :class="(secopsReport.review_required || secopsReport.status === 'failed')
+                  ? 'bg-red-900/40 text-red-400'
+                  : 'bg-emerald-900/40 text-emerald-400'"
+              >
+                {{ secopsReport.status || (secopsReport.review_required ? 'Review required' : 'OK') }}
+              </span>
+            </label>
+
+            <div class="bg-slate-800/60 rounded-lg border border-slate-700 divide-y divide-slate-700/60 text-sm">
+
+              <!-- Surfaces -->
+              <div v-if="secopsReport.surfaces?.length" class="px-4 py-3">
+                <p class="text-xs text-slate-500 uppercase font-medium mb-1.5">Surfaces</p>
+                <div class="flex flex-wrap gap-1.5">
+                  <span
+                    v-for="s in secopsReport.surfaces" :key="s"
+                    class="text-xs px-2 py-0.5 rounded-full bg-violet-900/40 text-violet-300 border border-violet-700/40"
+                  >{{ s }}</span>
+                </div>
+              </div>
+
+              <!-- Risks -->
+              <div v-if="secopsReport.risks?.length" class="px-4 py-3">
+                <p class="text-xs text-slate-500 uppercase font-medium mb-1.5">Risks</p>
+                <ul class="space-y-1">
+                  <li v-for="(r, i) in secopsReport.risks" :key="i" class="flex gap-2 text-slate-300">
+                    <span class="text-red-500 flex-shrink-0">▲</span>{{ r }}
+                  </li>
+                </ul>
+              </div>
+
+              <!-- Recommendations -->
+              <div v-if="secopsReport.recommendations?.length" class="px-4 py-3">
+                <p class="text-xs text-slate-500 uppercase font-medium mb-1.5">Recommendations</p>
+                <ul class="space-y-1">
+                  <li v-for="(r, i) in secopsReport.recommendations" :key="i" class="flex gap-2 text-slate-300">
+                    <span class="text-emerald-500 flex-shrink-0">✓</span>{{ r }}
+                  </li>
+                </ul>
+              </div>
+
+              <!-- Issues (code-review mode) -->
+              <div v-if="secopsReport.issues?.length" class="px-4 py-3">
+                <p class="text-xs text-slate-500 uppercase font-medium mb-1.5">Issues</p>
+                <ul class="space-y-1">
+                  <li v-for="(issue, i) in secopsReport.issues" :key="i" class="flex gap-2 text-slate-300">
+                    <span class="text-red-500 flex-shrink-0">✗</span>{{ typeof issue === 'string' ? issue : JSON.stringify(issue) }}
+                  </li>
+                </ul>
+              </div>
+
+              <!-- Notes (code-review mode) -->
+              <div v-if="secopsReport.notes" class="px-4 py-3">
+                <p class="text-xs text-slate-500 uppercase font-medium mb-1.5">Notes</p>
+                <MarkdownContent :content="secopsReport.notes" />
+              </div>
             </div>
           </div>
 
@@ -373,7 +434,7 @@ function confirmDelete() {
           </div>
 
           <p
-            v-if="!story.notes && !story.tdd?.status && !story.qa?.status && !secopsNotes && !simplifyComments"
+            v-if="!story.notes && !story.tdd?.status && !story.qa?.status && !secopsReport && !simplifyComments"
             class="text-slate-600 text-sm italic"
           >
             No progress data yet.
