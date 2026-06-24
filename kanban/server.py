@@ -533,15 +533,29 @@ async def api_events():
 
     async def event_gen():
         nonlocal last, ticks_since_ping
+        last_mtime = _disk_mtime()
         yield f"data: refresh\n\n"  # immediate sync on connect/reconnect
+        mtime_ticks = 0
         while True:
             await asyncio.sleep(0.5)
             ticks_since_ping += 1
+            mtime_ticks += 1
             v = _story_version
             if v != last:
                 last = v
+                last_mtime = _disk_mtime()
                 ticks_since_ping = 0
+                mtime_ticks = 0
                 yield f"data: refresh\n\n"
+            elif mtime_ticks >= 10:  # check disk every 5 s for direct file edits
+                mtime_ticks = 0
+                m = _disk_mtime()
+                if m != last_mtime:
+                    last_mtime = m
+                    bump_version()  # sync in-process version with disk reality
+                    last = _story_version
+                    ticks_since_ping = 0
+                    yield f"data: refresh\n\n"
             elif ticks_since_ping >= 30:
                 ticks_since_ping = 0
                 yield ": ping\n\n"  # SSE comment — keeps the connection alive
