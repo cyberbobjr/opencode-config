@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { loadStories, updateStory, moveStory, reorderStories, createStory, deleteStory, triggerStory } from './api.js'
 import { STATUS_LABELS } from './constants.js'
 import StatsBar from './components/StatsBar.vue'
