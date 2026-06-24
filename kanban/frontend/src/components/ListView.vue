@@ -11,6 +11,40 @@ const STATUS_ORDER = Object.fromEntries(
   Object.keys(STATUS_LABELS).map((k, i) => [k, i])
 )
 
+// ── Filters ───────────────────────────────────────────────────────────
+const activeStatuses = ref(new Set())
+const activeStacks   = ref(new Set())
+
+const availableStatuses = computed(() => {
+  const seen = new Set(props.stories.map(s => s.status))
+  return Object.keys(STATUS_LABELS).filter(k => seen.has(k))
+})
+
+const availableStacks = computed(() => {
+  const seen = new Set(props.stories.flatMap(s => s.stack || []))
+  return [...seen].sort()
+})
+
+function toggleStatus(s) {
+  const next = new Set(activeStatuses.value)
+  next.has(s) ? next.delete(s) : next.add(s)
+  activeStatuses.value = next
+}
+
+function toggleStack(t) {
+  const next = new Set(activeStacks.value)
+  next.has(t) ? next.delete(t) : next.add(t)
+  activeStacks.value = next
+}
+
+function clearFilters() {
+  activeStatuses.value = new Set()
+  activeStacks.value   = new Set()
+}
+
+const hasFilters = computed(() => activeStatuses.value.size > 0 || activeStacks.value.size > 0)
+
+// ── Sort ──────────────────────────────────────────────────────────────
 const sortKey = ref('id')
 const sortDir = ref(1)
 
@@ -23,19 +57,22 @@ function setSort(key) {
   }
 }
 
-const sorted = computed(() =>
-  [...props.stories].sort((a, b) => {
-    let av = sortKey.value === 'status'
-      ? (STATUS_ORDER[a.status] ?? 99)
-      : (a[sortKey.value] ?? '')
-    let bv = sortKey.value === 'status'
-      ? (STATUS_ORDER[b.status] ?? 99)
-      : (b[sortKey.value] ?? '')
+// ── Filter → Sort ─────────────────────────────────────────────────────
+const sorted = computed(() => {
+  let rows = props.stories
+  if (activeStatuses.value.size)
+    rows = rows.filter(s => activeStatuses.value.has(s.status))
+  if (activeStacks.value.size)
+    rows = rows.filter(s => (s.stack || []).some(t => activeStacks.value.has(t)))
+
+  return [...rows].sort((a, b) => {
+    const av = sortKey.value === 'status' ? (STATUS_ORDER[a.status] ?? 99) : (a[sortKey.value] ?? '')
+    const bv = sortKey.value === 'status' ? (STATUS_ORDER[b.status] ?? 99) : (b[sortKey.value] ?? '')
     if (av < bv) return -sortDir.value
     if (av > bv) return sortDir.value
     return 0
   })
-)
+})
 
 function sortIcon(key) {
   if (sortKey.value !== key) return '↕'
@@ -49,6 +86,47 @@ function formatTs(ts) {
 </script>
 
 <template>
+  <div class="flex flex-col gap-3">
+
+    <!-- Filter bar -->
+    <div class="flex flex-wrap gap-3 items-start">
+
+      <!-- Status chips -->
+      <div class="flex flex-wrap gap-1 items-center">
+        <span class="text-xs text-slate-500 mr-1">Status</span>
+        <button
+          v-for="s in availableStatuses"
+          :key="s"
+          class="text-xs px-2 py-0.5 rounded-full border transition-all"
+          :style="activeStatuses.has(s)
+            ? { backgroundColor: STATUS_COLORS[s] + '30', color: STATUS_COLORS[s], borderColor: STATUS_COLORS[s] }
+            : { borderColor: '#334155', color: '#64748b' }"
+          @click="toggleStatus(s)"
+        >{{ STATUS_LABELS[s] }}</button>
+      </div>
+
+      <!-- Stack chips -->
+      <div v-if="availableStacks.length" class="flex flex-wrap gap-1 items-center">
+        <span class="text-xs text-slate-500 mr-1">Stack</span>
+        <button
+          v-for="t in availableStacks"
+          :key="t"
+          class="text-xs px-2 py-0.5 rounded-full border transition-all"
+          :style="activeStacks.has(t)
+            ? { backgroundColor: (STACK_COLORS[t] ?? '#6b7280') + '30', color: STACK_COLORS[t] ?? '#9ca3af', borderColor: STACK_COLORS[t] ?? '#6b7280' }
+            : { borderColor: '#334155', color: '#64748b' }"
+          @click="toggleStack(t)"
+        >{{ t }}</button>
+      </div>
+
+      <!-- Clear -->
+      <button
+        v-if="hasFilters"
+        class="text-xs text-slate-500 hover:text-slate-300 underline ml-auto"
+        @click="clearFilters"
+      >Clear filters</button>
+    </div>
+
   <div class="overflow-x-auto">
     <table class="w-full text-sm border-collapse">
       <thead>
@@ -105,5 +183,6 @@ function formatTs(ts) {
       </tbody>
     </table>
     <p v-if="!sorted.length" class="text-slate-500 text-sm text-center py-8">No stories</p>
+  </div>
   </div>
 </template>
