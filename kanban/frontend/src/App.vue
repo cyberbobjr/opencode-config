@@ -1,6 +1,6 @@
 <script setup>
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
-import { loadConfig, loadStories, updateStory, moveStory, reorderStories, createStory, deleteStory, triggerStory } from './api.js'
+import { loadConfig, loadOCStatus, loadStories, updateStory, moveStory, reorderStories, createStory, deleteStory, triggerStory } from './api.js'
 import { STATUS_LABELS } from './constants.js'
 import StatsBar from './components/StatsBar.vue'
 import KanbanBoard from './components/KanbanBoard.vue'
@@ -20,6 +20,7 @@ const ocConnected   = ref(false)
 const toasts        = ref([])
 const loading       = ref(false)
 const appTitle      = ref('Kanban')
+const ocBusy        = ref(false)
 
 // ── Derived ───────────────────────────────────────────────────────────
 const filteredStories = computed(() => {
@@ -133,8 +134,17 @@ function toggleAutoTrigger() {
   localStorage.setItem('kanban-auto-trigger', String(autoTrigger.value))
 }
 
+// ── OC busy polling ───────────────────────────────────────────────────
+async function pollOCStatus() {
+  try {
+    const { busy } = await loadOCStatus()
+    ocBusy.value = busy
+  } catch { ocBusy.value = false }
+}
+
 // ── SSE ───────────────────────────────────────────────────────────────
 let sse = null
+let ocPollTimer = null
 onMounted(async () => {
   try {
     const config = await loadConfig()
@@ -148,8 +158,13 @@ onMounted(async () => {
   sse.onmessage = (e) => {
     if (e.data === 'refresh') fetchStories()
   }
+  await pollOCStatus()
+  ocPollTimer = setInterval(pollOCStatus, 2000)
 })
-onUnmounted(() => sse?.close())
+onUnmounted(() => {
+  sse?.close()
+  clearInterval(ocPollTimer)
+})
 </script>
 
 <template>
@@ -206,6 +221,16 @@ onUnmounted(() => sse?.close())
           <span class="w-2 h-2 rounded-full" :class="autoTrigger ? 'bg-emerald-400' : 'bg-slate-600'" />
           Auto-trigger
         </button>
+
+        <!-- OC busy spinner -->
+        <div
+          v-if="ocBusy"
+          class="flex items-center gap-1.5 text-xs text-amber-400"
+          title="OpenCode is processing…"
+        >
+          <i class="ti ti-loader-2 animate-spin text-sm" />
+          Processing…
+        </div>
 
         <!-- OC status -->
         <div

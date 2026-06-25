@@ -13,6 +13,10 @@ export function loadConfig() {
   return request('/config')
 }
 
+export function loadOCStatus() {
+  return request('/opencode/status')
+}
+
 export function loadStories() {
   return request('/stories')
 }

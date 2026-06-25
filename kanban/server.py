@@ -517,6 +517,17 @@ def api_config():
     return {"app_title": APP_TITLE}
 
 
+@rest.get("/api/opencode/status")
+def api_opencode_status():
+    """Proxy to OpenCode /session/status — returns {"busy": bool}."""
+    try:
+        with urlopen(f"{OPENCODE_SERVER_URL}/session/status", timeout=2) as r:
+            data = json.loads(r.read())
+        return {"busy": bool(data)}
+    except Exception:
+        return {"busy": False}
+
+
 @rest.get("/api/stats")
 def api_stats():
     return stats(load_all())
