@@ -26,6 +26,36 @@ python .opencode/kanban/server.py
 
 Les données des user stories sont dans `user-stories/*.json`.
 
+## Format Markdown obligatoire — champs texte
+
+> ⚠️ **S'applique à TOUTES les étapes ci-dessous** (création, refinement, TDD, QA, SecOps, Simplify).
+
+Tous les champs texte écrits via `kanban-update-story` sont rendus en Markdown dans le dashboard.
+Écrire du texte brut produit un bloc illisible (`\n` simples collapsés en espaces par CommonMark).
+
+**Règles impératives :**
+1. Séparer les sections par une **ligne vide** (`\n\n`) — un seul `\n` → espace dans le rendu
+2. Titres avec `## ` — jamais de texte nu comme `Résumé :`
+3. Listes avec `- ` — jamais de virgules sur une ligne
+4. Chemins en backtick — `` `frontend/src/api/client.ts` ``
+
+```markdown
+## Résumé
+
+Description courte du problème ou de la fonctionnalité.
+
+## Contexte
+
+- Point clé 1
+- Point clé 2
+
+## Critères d'acceptation
+
+- `fichier.ts` — raison de la modification
+```
+
+---
+
 ## Cycle d'une Story (6 étapes)
 
 ```
@@ -38,7 +68,7 @@ Les données des user stories sont dans `user-stories/*.json`.
   ▸ /refine US X.Y                     → Agent raffinement (4 angles)
   ▸ /architect                         → Valider l'architecture
   ▸ /secops US X.Y mode=threat-model   → Surfaces d'attaque
-  ▸ kanban-update-story(...)           → Mettre à jour AC + description
+  ▸ kanban-update-story(...)           → Mettre à jour AC + description  ← FORMAT MARKDOWN
   ▸ kanban-move-story("US X.Y", "tdd")
 
 Étape 2 : Implémentation TDD
