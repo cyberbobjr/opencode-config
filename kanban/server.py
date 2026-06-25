@@ -218,14 +218,40 @@ def _tui_type_and_submit(cmd: str, base: str) -> None:
         log.warning(f"  ⚠ TUI submit failed ({base}): {e}")
 
 
+def _pick_available_session() -> int | None:
+    """Return the port of a non-processing routable session, or any routable one.
+
+    Prefers idle sessions so commands don't pile up on a single busy instance.
+    """
+    with _sessions_lock:
+        sessions = _read_sessions()
+        alive = {pid: info for pid, info in sessions.items() if _pid_alive(int(pid))}
+
+    routable = [info for info in alive.values()
+                if info.get("routable") and info.get("opencode_port")]
+    if not routable:
+        return None
+
+    for info in routable:
+        if not _probe_processing(info["opencode_port"]):
+            return info["opencode_port"]
+
+    # All busy — fall back to the first routable session
+    return routable[0]["opencode_port"]
+
+
 def _resolve_target_url(target_port: int | None) -> str:
     """Return the OpenCode server URL to target.
 
-    If target_port is given (from dashboard session selector), use it directly.
-    Otherwise use the configured OPENCODE_SERVER_URL.
+    If target_port is given (explicit dashboard selection), use it directly.
+    Otherwise auto-route to an idle routable session, falling back to the
+    configured default only when no session registry is available.
     """
     if target_port:
         return f"http://localhost:{target_port}"
+    port = _pick_available_session()
+    if port:
+        return f"http://localhost:{port}"
     return OPENCODE_SERVER_URL
 
 
@@ -302,39 +328,60 @@ def _discover_opencode_port() -> int | None:
     Without --port, there is no HTTP server and TUI routing is impossible.
 
     Resolution order:
-      1. OPENCODE_SERVER_URL env var  (explicit full URL takes priority)
-      2. OPENCODE_PORT env var / .env  (explicit port)
-      3. None  (opencode launched without --port → no HTTP server)
+      1. psutil: inspect parent process (PPID) TCP LISTEN sockets directly
+         — the only reliable way to distinguish two instances on different ports
+      2. OPENCODE_SERVER_URL env var  (explicit override)
+      3. OPENCODE_PORT env var / .env — only if not already claimed by another session
+      4. None  (opencode launched without --port → no HTTP server)
     """
-    # If the user explicitly set OPENCODE_SERVER_URL, extract the port from it
+    # Best: ask the OS which TCP port the parent OpenCode process is listening on
+    try:
+        import psutil
+        ppid = os.getppid()
+        parent = psutil.Process(ppid)
+        # net_connections() in psutil >= 6.0; connections() in older versions
+        try:
+            conns = parent.net_connections(kind="inet")
+        except AttributeError:
+            conns = parent.connections(kind="inet")  # type: ignore[attr-defined]
+        for conn in conns:
+            if conn.status == "LISTEN":
+                port = conn.laddr.port
+                try:
+                    with urlopen(f"http://localhost:{port}/session/status", timeout=1):
+                        log.info(f"  OpenCode port via psutil PPID={ppid}: {port}")
+                        return port
+                except Exception:
+                    pass
+    except Exception as e:
+        log.debug(f"  psutil discovery failed: {e}")
+
+    # Explicit URL override
     explicit_url = os.environ.get("OPENCODE_SERVER_URL", "")
     if explicit_url and explicit_url != f"http://localhost:{OPENCODE_PORT}":
         try:
             port = int(explicit_url.rstrip("/").rsplit(":", 1)[-1])
-            # Verify the port actually responds to OpenCode's API
             with urlopen(f"http://localhost:{port}/session/status", timeout=2):
                 log.info(f"  OpenCode port from OPENCODE_SERVER_URL: {port}")
                 return port
         except Exception:
             pass
 
-    # If OPENCODE_PORT was explicitly set (not the default 4096), trust it
-    port_from_env = int(os.environ.get("OPENCODE_PORT", "0"))
-    if port_from_env and port_from_env != 4096:
+    # Configured port — only if not already claimed by a live peer session
+    candidate = int(os.environ.get("OPENCODE_PORT", "0")) or OPENCODE_PORT
+    existing = _read_sessions()
+    already_claimed = any(
+        info.get("opencode_port") == candidate and pid != str(os.getpid())
+        for pid, info in existing.items()
+        if _pid_alive(int(pid))
+    )
+    if not already_claimed:
         try:
-            with urlopen(f"http://localhost:{port_from_env}/session/status", timeout=2):
-                log.info(f"  OpenCode port from OPENCODE_PORT env: {port_from_env}")
-                return port_from_env
+            with urlopen(f"http://localhost:{candidate}/session/status", timeout=2):
+                log.info(f"  OpenCode port from config (unclaimed): {candidate}")
+                return candidate
         except Exception:
             pass
-
-    # Try the default port 4096 (only if it actually responds)
-    try:
-        with urlopen(f"http://localhost:{OPENCODE_PORT}/session/status", timeout=2):
-            log.info(f"  OpenCode port confirmed at default: {OPENCODE_PORT}")
-            return OPENCODE_PORT
-    except Exception:
-        pass
 
     log.info("  OpenCode HTTP server not reachable — launched without --port (TUI routing disabled)")
     return None
