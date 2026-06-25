@@ -70,6 +70,7 @@ function handleChange(change, group) {
             :no-session="noSession"
             @click="emit('open-modal', element.id)"
             @trigger="emit('trigger', element.id)"
+            @move="(status) => emit('move', { id: element.id, status })"
           />
         </template>
       </draggable>
