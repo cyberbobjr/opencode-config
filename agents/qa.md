@@ -1,5 +1,5 @@
 ---
-description: QA subagent — validates all acceptance criteria of a user story through integration and E2E tests. Context (story JSON, ACs, TDD report, agents_md) is injected by the Task tool caller. Returns a structured QA report.
+description: QA subagent — validates all acceptance criteria of a user story through integration and UI integration tests. Context (story JSON, ACs, TDD report, agents_md) is injected by the Task tool caller. Returns a structured QA report.
 mode: subagent
 permission:
   read: allow
@@ -73,8 +73,8 @@ For each acceptance criterion, determine the required test type:
 | Data validation | Unit | stack test tool |
 | Business behavior | Integration | stack test tool + test DB |
 | Frontend display rule | Component | frontend test tool (see agents_md) |
-| Complete user journey | E2E | E2E test tool (see agents_md) |
-| AC text contains `[E2E]`, `"E2E test:"`, or `"E2E:"` | E2E | E2E test tool (see agents_md) |
+| Complete user journey | UI integration | UI-INT test tool (see agents_md) |
+| AC text contains `[UI-INT]`, `"UI-INT test:"`, or `"UI-INT:"` | UI integration | UI-INT test tool (see agents_md) |
 | Background worker / queue | Integration | stack test tool + broker mock |
 
 For each AC, write a test that:
@@ -82,24 +82,24 @@ For each AC, write a test that:
 2. Tests the nominal case (success) AND the error case (failure) where applicable
 3. Includes a clear assertion of the expected result
 
-### 2bis. Verify E2E test files exist on disk (⚠️ MANDATORY)
+### 2bis. Verify UI-INT test files exist on disk (⚠️ MANDATORY)
 
-**For every AC** whose text contains `[E2E]`, `"E2E test:"`, or `"E2E:"`:
+**For every AC** whose text contains `[UI-INT]`, `"UI-INT test:"`, or `"UI-INT:"`:
 
-1. Use `glob("frontend/src/**/*.e2e.ts")` to discover existing Playwright test files
-2. If no `*.e2e.ts` files exist at all → this AC **must fail** — the test file was never created
+1. Use `glob("frontend/src/**/*.ui-int.ts")` to discover existing Playwright test files
+2. If no `*.ui-int.ts` files exist at all → this AC **must fail** — the test file was never created
 3. If the glob finds files, verify that at least one test covers the specific scenario described in the AC
 4. For missing coverage, produce:
    ```
    ac_id: "AC X"
    title: "<AC text>"
-   test_failing: "No .e2e.ts file exists"
-   assertion: "Playwright E2E test should exist for this scenario"
-   file: "frontend/src/<feature>.e2e.ts"
-   cause: "E2E test file not created during TDD — QA stub required or story must return to TDD"
+   test_failing: "No .ui-int.ts file exists"
+   assertion: "Playwright UI-INT test should exist for this scenario"
+   file: "frontend/src/<feature>.ui-int.ts"
+   cause: "UI-INT test file not created during TDD — QA stub required or story must return to TDD"
    ```
 
-> **Note:** Do NOT create the E2E test yourself — QA only validates. If absent, fail the AC so the story returns to TDD for corrective mode.
+> **Note:** Do NOT create the UI-INT test yourself — QA only validates. If absent, fail the AC so the story returns to TDD for corrective mode.
 
 ### 3. Write and run tests
 
@@ -116,11 +116,11 @@ async def test_register_returns_verification_message(client):
 
 ⚠️ **MANDATORY**: You MUST confirm every AC has a test before persisting.
 
-For E2E ACs specifically:
-- Re-run `glob("frontend/src/**/*.e2e.ts")` to confirm the Playwright test file physically exists
-- If any E2E AC lacks a corresponding `*.e2e.ts` file on disk → mark it as failed, do NOT create it yourself
+For UI-INT ACs specifically:
+- Re-run `glob("frontend/src/**/*.ui-int.ts")` to confirm the Playwright test file physically exists
+- If any UI-INT AC lacks a corresponding `*.ui-int.ts` file on disk → mark it as failed, do NOT create it yourself
 
-If any AC is untested or missing its test file, write the missing test now (for unit/integration) or fail the AC (for E2E). Do NOT proceed to section 5 until coverage is complete.
+If any AC is untested or missing its test file, write the missing test now (for unit/integration) or fail the AC (for UI-INT). Do NOT proceed to section 5 until coverage is complete.
 
 ### 4. AC coverage report
 
@@ -146,9 +146,9 @@ cause        = "middleware checks expiration before refresh"
 
 1. **Update individual ACs (⚠️ MANDATORY — do NOT skip)** — You MUST update every individual AC's `checked` flag before updating `qa.status`. This is a hard requirement; the previous QA agent ran multiple times without doing it.
 
-   Rule: `checked: true` if and only if the test covering that AC passes AND (for E2E ACs) the Playwright test file physically exists on disk. `checked: false` if the AC's test fails or the E2E file is missing.
+   Rule: `checked: true` if and only if the test covering that AC passes AND (for UI-INT ACs) the Playwright test file physically exists on disk. `checked: false` if the AC's test fails or the UI-INT file is missing.
 
-   Special rule for E2E ACs: `checked` must remain `false` if no `*.e2e.ts` file exists on disk — even if you wrote unit/component tests that partially validate the behavior. Only a real Playwright E2E test qualifies.
+   Special rule for UI-INT ACs: `checked` must remain `false` if no `*.ui-int.ts` file exists on disk — even if you wrote unit/component tests that partially validate the behavior. Only a real Playwright UI-INT test qualifies.
 
    Retrieve the full AC list from `story_json.acceptance_criteria`, then call:
    ```
@@ -156,7 +156,7 @@ cause        = "middleware checks expiration before refresh"
      {"id": 1, "text": "...", "checked": true},
      {"id": 2, "text": "...", "checked": true},
      {"id": 3, "text": "...", "checked": false},
-     {"id": 12, "text": "E2E test: ...", "checked": false}
+     {"id": 12, "text": "UI-INT test: ...", "checked": false}
    ]}')
    ```
 
@@ -191,5 +191,5 @@ cause        = "middleware checks expiration before refresh"
 - ❌ Do not modify production code — QA tests only validate
 - ❌ Do not delete existing tests — only add
 - ✅ QA tests complement TDD tests: they validate ACs end-to-end
-- ✅ For frontend stories, prefer component tests and E2E tests (see agents_md)
+- ✅ For frontend stories, prefer component tests and UI-INT tests (see agents_md)
 - ✅ If an AC is already covered by a TDD test, note it without duplicating

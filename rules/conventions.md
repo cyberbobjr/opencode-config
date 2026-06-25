@@ -102,7 +102,7 @@ Si vous avez besoin d'un élément d'interface qui n'a pas d'équivalent Storybo
 1. **Ne pas utiliser de HTML natif** — la règle ESLint le bloque
 2. **Créer une US** dans le Backlog pour le composant manquant (`US X.Y — Créer composant <Nom>`)
 3. **Utiliser un composant existant** qui s'en approche le plus (ex: `<Textbox>` pour un textarea sophistiqué)
-4. La nouvelle US doit inclure : `*.vue`, `*.stories.ts`, `__tests__/*.test.ts`, et `*.e2e.ts` si applicable
+4. La nouvelle US doit inclure : `*.vue`, `*.stories.ts`, `__tests__/*.test.ts`, et `*.ui-int.ts` si applicable
 5. Une fois le catalogue complété, toute migration de page existante peut utiliser le nouveau composant
 
 ### Quality Gates

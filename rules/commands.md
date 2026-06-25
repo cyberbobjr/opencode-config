@@ -47,7 +47,7 @@ cd ../backend && alembic upgrade head
 | `npx eslint src` | Lint |
 | `npx prettier --check src` | Vérification format |
 | `npx prettier --write src` | Auto-format |
-| `npx playwright test` | E2E |
+| `npx playwright test` | UI-INT |
 
 ## Kanban
 
@@ -84,7 +84,7 @@ cd frontend && npx eslint src && npx prettier --check src && npx vue-tsc --noEmi
 ```bash
 cd backend && pytest --cov=app --cov-report=term-missing --cov-fail-under=80
 cd frontend && npx vitest --coverage --coverage.threshold.100.branches=80
-npx playwright test
+npm run test:ui-int
 python scripts/audit-storybook-usage.py --exit-code  # Bloque si violations Storybook
 cd frontend && npx storybook build --quiet            # Bloque si erreur Storybook
 ```
