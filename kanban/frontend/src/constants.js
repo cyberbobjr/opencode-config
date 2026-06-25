@@ -2,7 +2,7 @@ export const STATUS_LABELS = {
   pending:      'Pending',
   refining:     'Refining',
   secops_tm:    'SecOps TM',
-  tdd:          'TDD',
+  tdd:          'Ready to TDD',
   secops_cr:    'SecOps CR',
   qa:           'QA',
   simplify:     'Simplify',
