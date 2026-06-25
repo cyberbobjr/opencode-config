@@ -668,13 +668,34 @@ def api_config():
 
 @rest.get("/api/opencode/status")
 def api_opencode_status():
-    """Proxy to OpenCode /session/status — returns {"busy": bool}."""
-    try:
-        with urlopen(f"{OPENCODE_SERVER_URL}/session/status", timeout=2) as r:
-            data = json.loads(r.read())
-        return {"busy": bool(data)}
-    except Exception:
-        return {"busy": False}
+    """Check all registered OpenCode sessions. Returns total connected and processing counts."""
+    with _sessions_lock:
+        sessions = _read_sessions()
+        alive = {pid: info for pid, info in sessions.items() if _pid_alive(int(pid))}
+
+    if not alive:
+        # No registered sessions — fall back to the configured default port
+        try:
+            with urlopen(f"{OPENCODE_SERVER_URL}/session/status", timeout=2) as r:
+                busy = bool(json.loads(r.read()))
+            total, processing = 1, (1 if busy else 0)
+        except Exception:
+            total, processing = 0, 0
+        return {"total": total, "processing": processing, "busy": processing > 0}
+
+    processing = 0
+    for info in alive.values():
+        port = info.get("opencode_port")
+        if not port:
+            continue
+        try:
+            with urlopen(f"http://localhost:{port}/session/status", timeout=2) as r:
+                if bool(json.loads(r.read())):
+                    processing += 1
+        except Exception:
+            pass
+
+    return {"total": len(alive), "processing": processing, "busy": processing > 0}
 
 
 @rest.get("/api/stats")

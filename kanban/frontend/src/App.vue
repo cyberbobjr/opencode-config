@@ -21,6 +21,8 @@ const toasts        = ref([])
 const loading       = ref(false)
 const appTitle      = ref('Kanban')
 const ocBusy        = ref(false)
+const ocTotal       = ref(0)
+const ocProcessing  = ref(0)
 
 // ── Derived ───────────────────────────────────────────────────────────
 const filteredStories = computed(() => {
@@ -137,9 +139,15 @@ function toggleAutoTrigger() {
 // ── OC busy polling ───────────────────────────────────────────────────
 async function pollOCStatus() {
   try {
-    const { busy } = await loadOCStatus()
+    const { busy, total, processing } = await loadOCStatus()
     ocBusy.value = busy
-  } catch { ocBusy.value = false }
+    ocTotal.value = total ?? 0
+    ocProcessing.value = processing ?? 0
+  } catch {
+    ocBusy.value = false
+    ocTotal.value = 0
+    ocProcessing.value = 0
+  }
 }
 
 // ── SSE ───────────────────────────────────────────────────────────────
@@ -222,22 +230,28 @@ onUnmounted(() => {
           Auto-trigger
         </button>
 
-        <!-- OC busy spinner -->
+        <!-- OC sessions indicator -->
         <div
-          v-if="ocBusy"
-          class="flex items-center gap-1.5 text-xs text-amber-400 animate-pulse"
-          title="OpenCode is processing…"
+          class="flex items-center gap-2 text-xs px-2.5 py-1.5 rounded-lg border"
+          :class="ocConnected ? 'border-slate-700 text-slate-400' : 'border-slate-800 text-slate-600'"
+          :title="`${ocTotal} session(s) connected · ${ocProcessing} processing`"
         >
-          <i class="ti ti-loader-2 animate-spin text-sm" />
-          Processing…
+          <!-- connected dot -->
+          <span
+            class="w-2 h-2 rounded-full flex-shrink-0"
+            :class="ocConnected ? 'bg-emerald-400' : 'bg-slate-600'"
+          />
+          <!-- session count -->
+          <span>{{ ocTotal }}</span>
+          <!-- processing badge -->
+          <span
+            v-if="ocProcessing > 0"
+            class="flex items-center gap-1 text-amber-400 animate-pulse"
+          >
+            <i class="ti ti-loader-2 animate-spin" />
+            {{ ocProcessing }}
+          </span>
         </div>
-
-        <!-- OC status -->
-        <div
-          class="w-2 h-2 rounded-full flex-shrink-0"
-          :class="ocConnected ? 'bg-emerald-400' : 'bg-slate-600'"
-          title="OpenCode connection"
-        />
 
         <!-- New story -->
         <button
