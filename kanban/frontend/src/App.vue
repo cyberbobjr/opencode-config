@@ -225,7 +225,7 @@ onUnmounted(() => {
         <!-- OC busy spinner -->
         <div
           v-if="ocBusy"
-          class="flex items-center gap-1.5 text-xs text-amber-400"
+          class="flex items-center gap-1.5 text-xs text-amber-400 animate-pulse"
           title="OpenCode is processing…"
         >
           <i class="ti ti-loader-2 animate-spin text-sm" />

@@ -17,6 +17,7 @@ import asyncio
 import threading
 import logging
 import copy
+import time
 from pathlib import Path
 from datetime import date, datetime
 from urllib.request import Request, urlopen
@@ -167,27 +168,40 @@ STATUS_COMMANDS = {
 
 
 def _tui_type_and_submit(cmd: str) -> None:
-    """Simulate typing a command in the active OpenCode TUI and pressing Enter.
+    """Create a fresh OpenCode session, navigate to it, then submit cmd.
 
-    Uses /tui/append-prompt + /tui/submit-prompt — the same mechanism used by
-    IDE plugins to drive the TUI from outside. Targets whatever session is
-    currently displayed, no session ID needed.
+    Each kanban trigger starts in a clean context (0 prior messages) to avoid
+    context-size blowup from accumulated session history.
     """
     base = OPENCODE_SERVER_URL
     headers = {"Content-Type": "application/json"}
     try:
-        # 1. Clear any text already in the prompt box
-        urlopen(Request(f"{base}/tui/clear-prompt", data=b"{}", headers=headers), timeout=3)
-        # 2. Type the command
+        # 1. Create a new blank session — returns {"id": "ses_...", ...}
+        with urlopen(Request(f"{base}/session", data=b"{}", headers=headers), timeout=3) as resp:
+            session = json.loads(resp.read())
+        session_id = session["id"]
+
+        # 2. Navigate the TUI to the new (empty) session
+        select_body = json.dumps({"sessionID": session_id}).encode()
+        urlopen(Request(f"{base}/tui/select-session", data=select_body, headers=headers), timeout=3)
+
+        # Wait for the TUI to finish rendering the new session before typing into it.
+        # Without this delay, append-prompt targets the old session's input box.
+        time.sleep(0.5)
+
+        # 3. Type the command
         body = json.dumps({"text": cmd}).encode()
         urlopen(Request(f"{base}/tui/append-prompt", data=body, headers=headers), timeout=3)
-        # 3. Press Enter
+
+        # 4. Press Enter
         urlopen(Request(f"{base}/tui/submit-prompt", data=b"{}", headers=headers), timeout=3)
-        # 4. Show a toast so the user knows something happened
+
+        # 5. Toast confirmation
         toast = json.dumps({"title": "Kanban", "message": cmd, "variant": "info"}).encode()
         urlopen(Request(f"{base}/tui/show-toast", data=toast, headers=headers), timeout=3)
-        _debug({"step": "tui_submit", "command": cmd, "ok": True})
-        log.info(f"  → TUI submitted: {cmd}")
+
+        _debug({"step": "tui_submit", "command": cmd, "session_id": session_id, "ok": True})
+        log.info(f"  → TUI submitted in new session {session_id}: {cmd}")
     except Exception as e:
         _debug({"step": "tui_submit", "command": cmd, "error": str(e)})
         log.warning(f"  ⚠ TUI submit failed: {e}")
