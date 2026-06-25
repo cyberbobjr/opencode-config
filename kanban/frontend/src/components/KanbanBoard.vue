@@ -1,14 +1,18 @@
 <script setup>
-import { reactive, watch } from 'vue'
+import { reactive, ref, watch } from 'vue'
 import draggable from 'vuedraggable'
 import KanbanCard from './KanbanCard.vue'
 import { KANBAN_COLUMNS } from '../constants.js'
+
+const DONE_PREVIEW = 8
 
 const props = defineProps({
   stories:   { type: Array,   required: true },
   noSession: { type: Boolean, default: false },
 })
 const emit = defineEmits(['move', 'reorder', 'open-modal', 'trigger'])
+
+const showAllDone = ref(false)
 
 function canMove(evt) {
   if (!props.noSession) return true
@@ -60,8 +64,33 @@ function handleChange(change, status) {
         </span>
       </div>
 
-      <!-- Draggable column body -->
+      <!-- Done column: static list with collapse -->
+      <template v-if="col.status === 'completed'">
+        <div class="min-h-12 rounded-lg bg-slate-800/40 p-2 space-y-2 border border-slate-800">
+          <KanbanCard
+            v-for="story in (showAllDone ? localCols.completed : localCols.completed.slice(0, DONE_PREVIEW))"
+            :key="story.id"
+            :story="story"
+            :no-session="noSession"
+            @click="emit('open-modal', story.id)"
+            @trigger="emit('trigger', story.id)"
+            @move="(status) => emit('move', { id: story.id, status })"
+          />
+          <button
+            v-if="localCols.completed.length > DONE_PREVIEW"
+            class="w-full text-xs text-slate-500 hover:text-slate-300 py-1.5 transition-colors"
+            @click="showAllDone = !showAllDone"
+          >
+            {{ showAllDone
+              ? '↑ Réduire'
+              : `↓ Voir les ${localCols.completed.length - DONE_PREVIEW} autres` }}
+          </button>
+        </div>
+      </template>
+
+      <!-- All other columns: draggable -->
       <draggable
+        v-else
         v-model="localCols[col.status]"
         group="kanban"
         item-key="id"
