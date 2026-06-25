@@ -5,9 +5,15 @@ import KanbanCard from './KanbanCard.vue'
 import { SIMPLE_GROUPS } from '../constants.js'
 
 const props = defineProps({
-  stories: { type: Array, required: true },
+  stories:   { type: Array,   required: true },
+  noSession: { type: Boolean, default: false },
 })
 const emit = defineEmits(['move', 'open-modal', 'trigger'])
+
+function canMove(evt) {
+  if (!props.noSession) return true
+  return evt.from === evt.to
+}
 
 const localCols = reactive(
   Object.fromEntries(SIMPLE_GROUPS.map(g => [g.id, []]))
@@ -54,10 +60,17 @@ function handleChange(change, group) {
         class="flex-1 min-h-12 rounded-b-lg bg-slate-800/40 p-2 space-y-2 border border-t-0 border-slate-800"
         ghost-class="opacity-30"
         chosen-class="drag-chosen"
+        :move="canMove"
         @change="(e) => handleChange(e, group)"
       >
         <template #item="{ element }">
-          <KanbanCard :story="element" :show-status="true" @click="emit('open-modal', element.id)" @trigger="emit('trigger', element.id)" />
+          <KanbanCard
+            :story="element"
+            :show-status="true"
+            :no-session="noSession"
+            @click="emit('open-modal', element.id)"
+            @trigger="emit('trigger', element.id)"
+          />
         </template>
       </draggable>
     </div>

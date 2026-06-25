@@ -28,6 +28,8 @@ const showSessionPopover = ref(false)
 const sessionBadgeRef    = ref(null)
 
 // ── Derived ───────────────────────────────────────────────────────────
+const noSession = computed(() => ocTotal.value === 0)
+
 const filteredStories = computed(() => {
   const q = searchQuery.value.trim().toLowerCase()
   if (!q) return stories.value
@@ -69,6 +71,10 @@ function toast(message, variant = 'success') {
 
 // ── Event handlers ────────────────────────────────────────────────────
 async function handleMove({ id, status }) {
+  if (noSession.value) {
+    toast('No OpenCode session — cannot move story', 'error')
+    return
+  }
   try {
     await moveStory(id, status, { noTrigger: !autoTrigger.value })
     await fetchStories()
@@ -80,6 +86,10 @@ async function handleMove({ id, status }) {
 }
 
 async function handleTrigger(id) {
+  if (noSession.value) {
+    toast('No OpenCode session — cannot trigger', 'error')
+    return
+  }
   try {
     const result = await triggerStory(id)
     toast(`▶ ${result.command}`)
@@ -348,6 +358,7 @@ onUnmounted(() => {
       <KanbanBoard
         v-if="currentView === 'kanban'"
         :stories="filteredStories"
+        :no-session="noSession"
         @move="handleMove"
         @reorder="handleReorder"
         @open-modal="modalStoryId = $event"
@@ -356,6 +367,7 @@ onUnmounted(() => {
       <SimpleView
         v-else-if="currentView === 'simple'"
         :stories="filteredStories"
+        :no-session="noSession"
         @move="handleMove"
         @open-modal="modalStoryId = $event"
         @trigger="handleTrigger"

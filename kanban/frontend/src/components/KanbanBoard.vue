@@ -5,9 +5,15 @@ import KanbanCard from './KanbanCard.vue'
 import { KANBAN_COLUMNS } from '../constants.js'
 
 const props = defineProps({
-  stories: { type: Array, required: true },
+  stories:   { type: Array,   required: true },
+  noSession: { type: Boolean, default: false },
 })
 const emit = defineEmits(['move', 'reorder', 'open-modal', 'trigger'])
+
+function canMove(evt) {
+  if (!props.noSession) return true
+  return evt.from === evt.to  // allow same-column reorder only
+}
 
 // Local mutable lists per column — vuedraggable needs to mutate them
 const localCols = reactive(
@@ -62,11 +68,13 @@ function handleChange(change, status) {
         class="min-h-12 rounded-lg bg-slate-800/40 p-2 space-y-2 border border-slate-800"
         ghost-class="opacity-30"
         chosen-class="drag-chosen"
+        :move="canMove"
         @change="(e) => handleChange(e, col.status)"
       >
         <template #item="{ element }">
           <KanbanCard
             :story="element"
+            :no-session="noSession"
             @click="emit('open-modal', element.id)"
             @trigger="emit('trigger', element.id)"
             @move="(status) => emit('move', { id: element.id, status })"
