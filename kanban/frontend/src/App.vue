@@ -1,6 +1,6 @@
 <script setup>
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
-import { loadConfig, loadOCStatus, loadSessions, loadStories, updateStory, moveStory, reorderStories, createStory, deleteStory, triggerStory } from './api.js'
+import { loadConfig, loadSessions, loadStories, updateStory, moveStory, reorderStories, createStory, deleteStory, triggerStory } from './api.js'
 import { STATUS_LABELS } from './constants.js'
 import StatsBar from './components/StatsBar.vue'
 import KanbanBoard from './components/KanbanBoard.vue'
@@ -142,19 +142,16 @@ function toggleAutoTrigger() {
 // ── OC busy polling ───────────────────────────────────────────────────
 async function pollOCStatus() {
   try {
-    const { busy, total, processing } = await loadOCStatus()
-    ocBusy.value = busy
-    ocTotal.value = total ?? 0
-    ocProcessing.value = processing ?? 0
+    const sessions = await loadSessions()
+    ocSessions.value = sessions
+    const entries = Object.values(sessions)
+    ocTotal.value = entries.length
+    ocProcessing.value = entries.filter(s => s.processing).length
+    ocBusy.value = ocProcessing.value > 0
   } catch {
     ocBusy.value = false
     ocTotal.value = 0
     ocProcessing.value = 0
-  }
-  try {
-    ocSessions.value = await loadSessions()
-  } catch {
-    /* keep previous value */
   }
 }
 
@@ -314,6 +311,14 @@ onUnmounted(() => {
                     : 'bg-slate-700 text-slate-500 border border-slate-600'"
                 >
                   {{ info.routable ? `:${info.opencode_port}` : 'MCP only' }}
+                </span>
+                <!-- processing badge -->
+                <span
+                  v-if="info.processing"
+                  class="flex items-center gap-1 text-amber-400 animate-pulse px-1.5 py-0.5 rounded bg-amber-900/30 border border-amber-800"
+                >
+                  <i class="ti ti-loader-2 animate-spin text-[10px]" />
+                  processing
                 </span>
                 <!-- start time -->
                 <span class="ml-auto text-slate-600 flex-shrink-0">{{ relativeTime(info.started) }}</span>

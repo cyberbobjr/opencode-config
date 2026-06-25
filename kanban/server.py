@@ -690,9 +690,20 @@ def api_trigger(sid: str, target_port: int | None = None):
     return {"ok": True, "command": cmd_str, "trigger": result}
 
 
+def _probe_processing(port: int | None) -> bool:
+    """Return True if the OpenCode instance on `port` is currently processing a prompt."""
+    if not port:
+        return False
+    try:
+        with urlopen(f"http://localhost:{port}/session/status", timeout=0.5) as r:
+            return bool(json.loads(r.read()))
+    except Exception:
+        return False
+
+
 @rest.get("/api/sessions")
 def api_sessions():
-    """Return registered OpenCode sessions (for dashboard session selector).
+    """Return registered OpenCode sessions with live per-session processing status.
     Dead sessions (process no longer running) are pruned on read.
     """
     with _sessions_lock:
@@ -700,7 +711,11 @@ def api_sessions():
         alive = {pid: info for pid, info in sessions.items() if _pid_alive(int(pid))}
         if len(alive) != len(sessions):
             _write_sessions(alive)
-    return alive
+
+    return {
+        pid: {**info, "processing": _probe_processing(info.get("opencode_port"))}
+        for pid, info in alive.items()
+    }
 
 
 @rest.delete("/api/stories/{sid}")
@@ -717,34 +732,13 @@ def api_config():
 
 @rest.get("/api/opencode/status")
 def api_opencode_status():
-    """Check all registered OpenCode sessions. Returns total connected and processing counts."""
-    with _sessions_lock:
-        sessions = _read_sessions()
-        alive = {pid: info for pid, info in sessions.items() if _pid_alive(int(pid))}
-
-    if not alive:
-        # No registered sessions — fall back to the configured default port
-        try:
-            with urlopen(f"{OPENCODE_SERVER_URL}/session/status", timeout=2) as r:
-                busy = bool(json.loads(r.read()))
-            total, processing = 1, (1 if busy else 0)
-        except Exception:
-            total, processing = 0, 0
-        return {"total": total, "processing": processing, "busy": processing > 0}
-
-    processing = 0
-    for info in alive.values():
-        port = info.get("opencode_port")
-        if not port:
-            continue
-        try:
-            with urlopen(f"http://localhost:{port}/session/status", timeout=2) as r:
-                if bool(json.loads(r.read())):
-                    processing += 1
-        except Exception:
-            pass
-
-    return {"total": len(alive), "processing": processing, "busy": processing > 0}
+    """Aggregate OpenCode status derived from per-session probes."""
+    sessions_data = api_sessions()
+    total = len(sessions_data)
+    if total == 0:
+        return {"total": 0, "processing": 0, "busy": False}
+    processing = sum(1 for s in sessions_data.values() if s.get("processing"))
+    return {"total": total, "processing": processing, "busy": processing > 0}
 
 
 @rest.get("/api/stats")
