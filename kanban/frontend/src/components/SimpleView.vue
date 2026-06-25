@@ -27,9 +27,13 @@ watch(
   () => props.stories,
   (newStories) => {
     SIMPLE_GROUPS.forEach(group => {
-      localCols[group.id] = [...newStories
-        .filter(s => group.statuses.includes(s.status))
-        .sort((a, b) => (a.order ?? 9999) - (b.order ?? 9999))]
+      const filtered = newStories.filter(s => group.statuses.includes(s.status))
+      if (group.id === 'termine') {
+        filtered.sort((a, b) => (b.updated_at ?? '').localeCompare(a.updated_at ?? ''))
+      } else {
+        filtered.sort((a, b) => (a.order ?? 9999) - (b.order ?? 9999))
+      }
+      localCols[group.id] = [...filtered]
     })
   },
   { immediate: true, deep: true }

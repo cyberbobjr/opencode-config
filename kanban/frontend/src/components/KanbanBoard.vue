@@ -28,9 +28,13 @@ watch(
   () => props.stories,
   (newStories) => {
     KANBAN_COLUMNS.forEach(col => {
-      localCols[col.status] = [...newStories
-        .filter(s => s.status === col.status)
-        .sort((a, b) => (a.order ?? 9999) - (b.order ?? 9999))]
+      const filtered = newStories.filter(s => s.status === col.status)
+      if (col.status === 'completed') {
+        filtered.sort((a, b) => (b.updated_at ?? '').localeCompare(a.updated_at ?? ''))
+      } else {
+        filtered.sort((a, b) => (a.order ?? 9999) - (b.order ?? 9999))
+      }
+      localCols[col.status] = [...filtered]
     })
   },
   { immediate: true, deep: true }
