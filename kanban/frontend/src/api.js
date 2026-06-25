@@ -9,6 +9,10 @@ async function request(path, options = {}) {
   return res.json()
 }
 
+export function loadConfig() {
+  return request('/config')
+}
+
 export function loadStories() {
   return request('/stories')
 }

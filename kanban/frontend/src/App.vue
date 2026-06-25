@@ -1,6 +1,6 @@
 <script setup>
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
-import { loadStories, updateStory, moveStory, reorderStories, createStory, deleteStory, triggerStory } from './api.js'
+import { loadConfig, loadStories, updateStory, moveStory, reorderStories, createStory, deleteStory, triggerStory } from './api.js'
 import { STATUS_LABELS } from './constants.js'
 import StatsBar from './components/StatsBar.vue'
 import KanbanBoard from './components/KanbanBoard.vue'
@@ -19,6 +19,7 @@ const autoTrigger   = ref(localStorage.getItem('kanban-auto-trigger') !== 'false
 const ocConnected   = ref(false)
 const toasts        = ref([])
 const loading       = ref(false)
+const appTitle      = ref('Kanban')
 
 // ── Derived ───────────────────────────────────────────────────────────
 const filteredStories = computed(() => {
@@ -135,6 +136,11 @@ function toggleAutoTrigger() {
 // ── SSE ───────────────────────────────────────────────────────────────
 let sse = null
 onMounted(async () => {
+  try {
+    const config = await loadConfig()
+    appTitle.value = config.app_title ?? 'Kanban'
+    document.title = config.app_title ?? 'Kanban'
+  } catch { /* keep default */ }
   await fetchStories()
   sse = new EventSource('/api/events')
   sse.addEventListener('open', () => { ocConnected.value = true })
@@ -154,7 +160,7 @@ onUnmounted(() => sse?.close())
       <div class="flex items-center gap-4 px-6 py-3 flex-wrap">
         <!-- Title -->
         <h1 class="text-base font-bold text-white mr-2 flex-shrink-0">
-          Kanban <span class="text-slate-500 font-normal text-sm">Stories</span>
+          {{ appTitle }}
         </h1>
 
         <!-- Search -->

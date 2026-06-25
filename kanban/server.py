@@ -44,6 +44,7 @@ _load_dotenv(HERE.parent / ".env")
 # Override via .opencode/.env or environment variables before launch.
 KANBAN_HTTP_PORT: int = int(os.environ.get("KANBAN_HTTP_PORT", "8765"))
 OPENCODE_PORT: int = int(os.environ.get("OPENCODE_PORT", "4096"))
+APP_TITLE: str = os.environ.get("APP_TITLE", "Kanban")
 
 # ── Debug flag (env var or --debug CLI argument) ─────────────────────
 # Enable with: KANBAN_DEBUG=1 python server.py --mcp
@@ -509,6 +510,11 @@ def api_delete(sid: str):
     if not delete_one(sid):
         raise HTTPException(404, f"Story {sid} not found")
     return {"ok": True}
+
+
+@rest.get("/api/config")
+def api_config():
+    return {"app_title": APP_TITLE}
 
 
 @rest.get("/api/stats")
