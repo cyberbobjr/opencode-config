@@ -29,6 +29,48 @@
 | i18n | `vue-i18n`, fichiers JSON dans `locales/` |
 | CSS | TailwindCSS utility-first |
 | Design system | Tokens définis dans `docs/design-system.md` + rendu dans `docs/designs/d-hybrid.html` |
+| Storybook | `.stories.ts` obligatoire pour chaque composant `.vue` — créer/modifier/supprimer en miroir |
+
+## Storybook — Règle Impérative
+
+Tout composant Vue doit avoir une story associée. Cette règle s'applique à **chaque modification** du dossier `frontend/src/components/`.
+
+| Opération | Action obligatoire |
+|-----------|-------------------|
+| Composant créé (`NomComp.vue`) | Créer `NomComp.stories.ts` dans le même dossier |
+| Composant modifié (props, slots, états) | Mettre à jour `NomComp.stories.ts` en conséquence |
+| Composant supprimé | Supprimer `NomComp.stories.ts` |
+
+### Contenu minimal d'une story
+
+```ts
+import type { Meta, StoryObj } from "@storybook/vue3-vite"
+import NomComp from "./NomComp.vue"
+
+const meta: Meta<typeof NomComp> = {
+  title: "NomComp",
+  component: NomComp,
+  tags: ["autodocs"],
+}
+export default meta
+
+type Story = StoryObj<typeof NomComp>
+
+// Au moins un état "nominal" + un état "vide" ou "erreur" si applicable
+export const Default: Story = { args: { /* props minimales */ } }
+```
+
+### Critère QA obligatoire
+
+Après toute modification de composant, le quality gate doit inclure :
+
+```bash
+cd frontend && npx storybook build --quiet
+```
+
+Un build Storybook en échec **bloque** le passage en `commit_ready`.
+
+---
 
 ## Git
 
