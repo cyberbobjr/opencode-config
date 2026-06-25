@@ -295,44 +295,49 @@ def _write_sessions(sessions: dict) -> None:
         json.dump(sessions, fh, indent=2)
 
 
-def _discover_opencode_port() -> int:
-    """Auto-discover the HTTP port of the parent OpenCode process.
+def _discover_opencode_port() -> int | None:
+    """Return the OpenCode HTTP port for this instance, or None if unavailable.
 
-    Uses lsof to list TCP listening ports of the parent PID, then probes each
-    candidate against OpenCode's /session/status endpoint to confirm identity.
-    Falls back to the configured OPENCODE_PORT if discovery fails.
+    OpenCode only exposes an HTTP server when launched with --port.
+    Without --port, there is no HTTP server and TUI routing is impossible.
+
+    Resolution order:
+      1. OPENCODE_SERVER_URL env var  (explicit full URL takes priority)
+      2. OPENCODE_PORT env var / .env  (explicit port)
+      3. None  (opencode launched without --port → no HTTP server)
     """
-    ppid = os.getppid()
+    # If the user explicitly set OPENCODE_SERVER_URL, extract the port from it
+    explicit_url = os.environ.get("OPENCODE_SERVER_URL", "")
+    if explicit_url and explicit_url != f"http://localhost:{OPENCODE_PORT}":
+        try:
+            port = int(explicit_url.rstrip("/").rsplit(":", 1)[-1])
+            # Verify the port actually responds to OpenCode's API
+            with urlopen(f"http://localhost:{port}/session/status", timeout=2):
+                log.info(f"  OpenCode port from OPENCODE_SERVER_URL: {port}")
+                return port
+        except Exception:
+            pass
+
+    # If OPENCODE_PORT was explicitly set (not the default 4096), trust it
+    port_from_env = int(os.environ.get("OPENCODE_PORT", "0"))
+    if port_from_env and port_from_env != 4096:
+        try:
+            with urlopen(f"http://localhost:{port_from_env}/session/status", timeout=2):
+                log.info(f"  OpenCode port from OPENCODE_PORT env: {port_from_env}")
+                return port_from_env
+        except Exception:
+            pass
+
+    # Try the default port 4096 (only if it actually responds)
     try:
-        result = subprocess.run(
-            ["lsof", "-p", str(ppid), "-iTCP", "-sTCP:LISTEN", "-n", "-P"],
-            capture_output=True, text=True, timeout=3,
-        )
-        candidates: list[int] = []
-        for line in result.stdout.splitlines()[1:]:  # skip header
-            parts = line.split()
-            if len(parts) >= 9:
-                addr = parts[8]  # e.g. "*:4097" or "127.0.0.1:4097"
-                port_str = addr.rsplit(":", 1)[-1]
-                try:
-                    port = int(port_str)
-                    if 1024 <= port <= 65535:
-                        candidates.append(port)
-                except ValueError:
-                    pass
+        with urlopen(f"http://localhost:{OPENCODE_PORT}/session/status", timeout=2):
+            log.info(f"  OpenCode port confirmed at default: {OPENCODE_PORT}")
+            return OPENCODE_PORT
+    except Exception:
+        pass
 
-        for port in candidates:
-            try:
-                with urlopen(f"http://localhost:{port}/session/status", timeout=1):
-                    log.info(f"  Auto-discovered OpenCode port: {port} (parent pid={ppid})")
-                    return port
-            except Exception:
-                pass
-    except Exception as e:
-        log.warning(f"  Port discovery failed: {e}")
-
-    log.info(f"  Using configured OPENCODE_PORT={OPENCODE_PORT} (discovery found nothing)")
-    return OPENCODE_PORT
+    log.info("  OpenCode HTTP server not reachable — launched without --port (TUI routing disabled)")
+    return None
 
 
 def _register_session() -> None:
@@ -341,11 +346,13 @@ def _register_session() -> None:
         sessions = _read_sessions()
         sessions = {pid: info for pid, info in sessions.items() if _pid_alive(int(pid))}
         sessions[str(os.getpid())] = {
-            "opencode_port": port,
+            "opencode_port": port,          # None when launched without --port
+            "routable": port is not None,   # False = no TUI routing available
             "started": datetime.now().isoformat(timespec="seconds"),
         }
         _write_sessions(sessions)
-    log.info(f"  Session registered: pid={os.getpid()} opencode_port={port}")
+    status = f"port={port}" if port else "no HTTP server (--port not set)"
+    log.info(f"  Session registered: pid={os.getpid()} {status}")
 
 
 def _unregister_session() -> None:
