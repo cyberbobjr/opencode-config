@@ -3,8 +3,9 @@ import { computed } from 'vue'
 import { STACK_COLORS, STATUS_COLORS, STATUS_LABELS, TRIGGERABLE_STATUSES, KANBAN_COLUMNS } from '../constants.js'
 
 const props = defineProps({
-  story: { type: Object, required: true },
+  story:     { type: Object,  required: true },
   showStatus: { type: Boolean, default: false },
+  noSession:  { type: Boolean, default: false },
 })
 const emit = defineEmits(['click', 'trigger', 'move'])
 
@@ -49,25 +50,37 @@ const nextCol  = computed(() => colIndex.value < KANBAN_COLUMNS.length - 1 ? KAN
     <div class="opacity-0 group-hover:opacity-100 transition-opacity flex justify-between gap-1 mt-2 -mx-0.5">
       <button
         v-if="prevCol"
-        class="flex-1 text-xs px-1.5 py-1 rounded bg-slate-700 hover:bg-slate-600 text-slate-400 hover:text-slate-200 truncate text-left transition-colors"
-        :title="`← ${prevCol.label}`"
-        @click.stop="emit('move', prevCol.status)"
+        class="flex-1 text-xs px-1.5 py-1 rounded truncate text-left transition-colors"
+        :class="noSession
+          ? 'bg-slate-800 text-slate-600 cursor-not-allowed'
+          : 'bg-slate-700 hover:bg-slate-600 text-slate-400 hover:text-slate-200'"
+        :title="noSession ? 'No OpenCode session' : `← ${prevCol.label}`"
+        :disabled="noSession"
+        @click.stop="!noSession && emit('move', prevCol.status)"
       >← {{ prevCol.label }}</button>
       <div v-else class="flex-1" />
       <button
         v-if="nextCol"
-        class="flex-1 text-xs px-1.5 py-1 rounded bg-slate-700 hover:bg-slate-600 text-slate-400 hover:text-slate-200 truncate text-right transition-colors"
-        :title="`${nextCol.label} →`"
-        @click.stop="emit('move', nextCol.status)"
+        class="flex-1 text-xs px-1.5 py-1 rounded truncate text-right transition-colors"
+        :class="noSession
+          ? 'bg-slate-800 text-slate-600 cursor-not-allowed'
+          : 'bg-slate-700 hover:bg-slate-600 text-slate-400 hover:text-slate-200'"
+        :title="noSession ? 'No OpenCode session' : `${nextCol.label} →`"
+        :disabled="noSession"
+        @click.stop="!noSession && emit('move', nextCol.status)"
       >{{ nextCol.label }} →</button>
     </div>
 
     <!-- ▶ Trigger button — visible on hover, only for triggerable statuses -->
     <button
       v-if="TRIGGERABLE_STATUSES.has(story.status)"
-      class="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded-md bg-slate-700 hover:bg-emerald-700 text-slate-400 hover:text-white"
-      title="Run OpenCode command"
-      @click.stop="emit('trigger', story.id)"
+      class="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded-md transition-colors"
+      :class="noSession
+        ? 'bg-slate-800 text-slate-600 cursor-not-allowed'
+        : 'bg-slate-700 hover:bg-emerald-700 text-slate-400 hover:text-white'"
+      :title="noSession ? 'No OpenCode session' : 'Run OpenCode command'"
+      :disabled="noSession"
+      @click.stop="!noSession && emit('trigger', story.id)"
     >
       <svg class="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
         <path d="M6.3 2.84A1.5 1.5 0 0 0 4 4.11v11.78a1.5 1.5 0 0 0 2.3 1.27l9.344-5.891a1.5 1.5 0 0 0 0-2.538L6.3 2.84Z"/>

@@ -1,6 +1,6 @@
 <script setup>
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
-import { loadConfig, loadOCStatus, loadStories, updateStory, moveStory, reorderStories, createStory, deleteStory, triggerStory } from './api.js'
+import { loadConfig, loadSessions, loadStories, updateStory, moveStory, reorderStories, createStory, deleteStory, triggerStory } from './api.js'
 import { STATUS_LABELS } from './constants.js'
 import StatsBar from './components/StatsBar.vue'
 import KanbanBoard from './components/KanbanBoard.vue'
@@ -20,9 +20,16 @@ const ocConnected   = ref(false)
 const toasts        = ref([])
 const loading       = ref(false)
 const appTitle      = ref('Kanban')
-const ocBusy        = ref(false)
+const ocBusy             = ref(false)
+const ocTotal            = ref(0)
+const ocProcessing       = ref(0)
+const ocSessions         = ref({})
+const showSessionPopover = ref(false)
+const sessionBadgeRef    = ref(null)
 
 // ── Derived ───────────────────────────────────────────────────────────
+const noSession = computed(() => !Object.values(ocSessions.value).some(s => s.routable))
+
 const filteredStories = computed(() => {
   const q = searchQuery.value.trim().toLowerCase()
   if (!q) return stories.value
@@ -64,6 +71,10 @@ function toast(message, variant = 'success') {
 
 // ── Event handlers ────────────────────────────────────────────────────
 async function handleMove({ id, status }) {
+  if (noSession.value) {
+    toast('No OpenCode session — cannot move story', 'error')
+    return
+  }
   try {
     await moveStory(id, status, { noTrigger: !autoTrigger.value })
     await fetchStories()
@@ -75,6 +86,10 @@ async function handleMove({ id, status }) {
 }
 
 async function handleTrigger(id) {
+  if (noSession.value) {
+    toast('No OpenCode session — cannot trigger', 'error')
+    return
+  }
   try {
     const result = await triggerStory(id)
     toast(`▶ ${result.command}`)
@@ -137,9 +152,33 @@ function toggleAutoTrigger() {
 // ── OC busy polling ───────────────────────────────────────────────────
 async function pollOCStatus() {
   try {
-    const { busy } = await loadOCStatus()
-    ocBusy.value = busy
-  } catch { ocBusy.value = false }
+    const sessions = await loadSessions()
+    ocSessions.value = sessions
+    const entries = Object.values(sessions)
+    ocTotal.value = entries.length
+    ocProcessing.value = entries.filter(s => s.processing).length
+    ocBusy.value = ocProcessing.value > 0
+  } catch {
+    ocBusy.value = false
+    ocTotal.value = 0
+    ocProcessing.value = 0
+  }
+}
+
+function relativeTime(isoString) {
+  const diff = Date.now() - new Date(isoString).getTime()
+  const mins = Math.floor(diff / 60000)
+  if (mins < 1) return 'just now'
+  if (mins < 60) return `${mins}m ago`
+  const hours = Math.floor(mins / 60)
+  if (hours < 24) return `${hours}h ago`
+  return `${Math.floor(hours / 24)}d ago`
+}
+
+function handleOutsideClick(e) {
+  if (showSessionPopover.value && sessionBadgeRef.value && !sessionBadgeRef.value.contains(e.target)) {
+    showSessionPopover.value = false
+  }
 }
 
 // ── SSE ───────────────────────────────────────────────────────────────
@@ -160,10 +199,12 @@ onMounted(async () => {
   }
   await pollOCStatus()
   ocPollTimer = setInterval(pollOCStatus, 2000)
+  document.addEventListener('click', handleOutsideClick)
 })
 onUnmounted(() => {
   sse?.close()
   clearInterval(ocPollTimer)
+  document.removeEventListener('click', handleOutsideClick)
 })
 </script>
 
@@ -222,22 +263,82 @@ onUnmounted(() => {
           Auto-trigger
         </button>
 
-        <!-- OC busy spinner -->
-        <div
-          v-if="ocBusy"
-          class="flex items-center gap-1.5 text-xs text-amber-400 animate-pulse"
-          title="OpenCode is processing…"
-        >
-          <i class="ti ti-loader-2 animate-spin text-sm" />
-          Processing…
-        </div>
+        <!-- OC sessions indicator -->
+        <div class="relative" ref="sessionBadgeRef">
+          <button
+            class="flex items-center gap-2 text-xs px-2.5 py-1.5 rounded-lg border transition-colors"
+            :class="ocConnected
+              ? 'border-slate-700 text-slate-400 hover:border-slate-600 hover:text-slate-300'
+              : 'border-slate-800 text-slate-600'"
+            :title="`${ocTotal} session(s) · ${ocProcessing} processing — click for details`"
+            @click.stop="showSessionPopover = !showSessionPopover"
+          >
+            <!-- connected dot -->
+            <span
+              class="w-2 h-2 rounded-full flex-shrink-0"
+              :class="ocConnected ? 'bg-emerald-400' : 'bg-slate-600'"
+            />
+            <!-- session count -->
+            <span>{{ ocTotal }}</span>
+            <!-- processing badge -->
+            <span
+              v-if="ocProcessing > 0"
+              class="flex items-center gap-1 text-amber-400 animate-pulse"
+            >
+              <i class="ti ti-loader-2 animate-spin" />
+              {{ ocProcessing }}
+            </span>
+          </button>
 
-        <!-- OC status -->
-        <div
-          class="w-2 h-2 rounded-full flex-shrink-0"
-          :class="ocConnected ? 'bg-emerald-400' : 'bg-slate-600'"
-          title="OpenCode connection"
-        />
+          <!-- Session popover -->
+          <div
+            v-if="showSessionPopover"
+            class="absolute right-0 top-full mt-1.5 z-50 w-72 bg-slate-800 border border-slate-700 rounded-lg shadow-xl p-3"
+          >
+            <p class="text-xs font-semibold text-slate-300 mb-2.5">OpenCode sessions</p>
+            <div v-if="Object.keys(ocSessions).length === 0" class="text-xs text-slate-500 italic">
+              No sessions found
+            </div>
+            <ul v-else class="flex flex-col gap-2">
+              <li
+                v-for="(info, pid) in ocSessions"
+                :key="pid"
+                class="flex items-center gap-2 text-xs"
+              >
+                <!-- routable dot -->
+                <span
+                  class="w-2 h-2 rounded-full flex-shrink-0"
+                  :class="info.routable ? 'bg-emerald-400' : 'bg-slate-500'"
+                  :title="info.routable ? 'Routable — dashboard can inject commands' : 'MCP only — launched without --port'"
+                />
+                <!-- PID -->
+                <span class="font-mono text-slate-300">{{ pid }}</span>
+                <!-- port / mode -->
+                <span
+                  class="px-1.5 py-0.5 rounded text-xs"
+                  :class="info.routable
+                    ? 'bg-emerald-900/40 text-emerald-400 border border-emerald-800'
+                    : 'bg-slate-700 text-slate-500 border border-slate-600'"
+                >
+                  {{ info.routable ? `:${info.opencode_port}` : 'MCP only' }}
+                </span>
+                <!-- processing badge -->
+                <span
+                  v-if="info.processing"
+                  class="flex items-center gap-1 text-amber-400 animate-pulse px-1.5 py-0.5 rounded bg-amber-900/30 border border-amber-800"
+                >
+                  <i class="ti ti-loader-2 animate-spin text-[10px]" />
+                  processing
+                </span>
+                <!-- start time -->
+                <span class="ml-auto text-slate-600 flex-shrink-0">{{ relativeTime(info.started) }}</span>
+              </li>
+            </ul>
+            <p class="text-xs text-slate-600 mt-2.5 pt-2 border-t border-slate-700">
+              <span class="inline-block w-2 h-2 rounded-full bg-emerald-400 mr-1 align-middle" />routable = pilotable from dashboard
+            </p>
+          </div>
+        </div>
 
         <!-- New story -->
         <button
@@ -257,6 +358,7 @@ onUnmounted(() => {
       <KanbanBoard
         v-if="currentView === 'kanban'"
         :stories="filteredStories"
+        :no-session="noSession"
         @move="handleMove"
         @reorder="handleReorder"
         @open-modal="modalStoryId = $event"
@@ -265,6 +367,7 @@ onUnmounted(() => {
       <SimpleView
         v-else-if="currentView === 'simple'"
         :stories="filteredStories"
+        :no-session="noSession"
         @move="handleMove"
         @open-modal="modalStoryId = $event"
         @trigger="handleTrigger"

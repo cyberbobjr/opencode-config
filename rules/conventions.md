@@ -72,6 +72,48 @@ Un build Storybook en échec **bloque** le passage en `commit_ready`.
 
 ---
 
+## Storybook — Utilisation Exclusive des Composants
+
+> ⚠️ **Règle impérative** — Tous les fichiers `.vue` (views, layouts, components hors `components/ui/`) doivent utiliser **uniquement les composants Storybook** pour les éléments d'interface : `<Input>`, `<Select>`, `<Button>`, `<Textbox>`, etc.
+
+### Règles
+
+| Règle | Détail |
+|-------|--------|
+| **Interdiction** | `<input>`, `<select>`, `<button>`, `<textarea>` sont **interdits** dans tout fichier `.vue` hors de `components/ui/` |
+| **Détection** | La règle ESLint `newscap/no-raw-html-elements` bloque ces violations (erreur bloquante) — à configurer dans le projet cible |
+| **Audit** | _(optionnel — projet-spécifique)_ Un script `scripts/audit-storybook-usage.py` peut être ajouté pour générer un rapport de violations |
+| **Composants manquants** | Si un composant Storybook n'existe pas pour un besoin UI → créer une US dédiée dans le catalogue, ne pas utiliser de HTML natif en attendant |
+| **Composants composites** | Les composants composites (CountryThemeSelector, DeliveryTimeSelector, DetailLevelSelector, ChipInput, etc.) doivent utiliser les primitives Storybook |
+
+### Catalogue Storybook disponible
+
+| Élément natif | Composant Storybook |
+|---------------|-------------------|
+| `<input>` | `<Input>` |
+| `<select>` | `<Select>` |
+| `<button>` | `<Button>` |
+| `<textarea>` | `<Textbox>` |
+
+### Composants manquants — Process
+
+Si vous avez besoin d'un élément d'interface qui n'a pas d'équivalent Storybook :
+
+1. **Ne pas utiliser de HTML natif** — la règle ESLint le bloque
+2. **Créer une US** dans le Backlog pour le composant manquant (`US X.Y — Créer composant <Nom>`)
+3. **Utiliser un composant existant** qui s'en approche le plus (ex: `<Textbox>` pour un textarea sophistiqué)
+4. La nouvelle US doit inclure : `*.vue`, `*.stories.ts`, `__tests__/*.test.ts`, et `*.ui-int.ts` si applicable
+5. Une fois le catalogue complété, toute migration de page existante peut utiliser le nouveau composant
+
+### Quality Gates
+
+```bash
+cd frontend && npx eslint src                # Bloque les violations
+# python scripts/audit-storybook-usage.py --exit-code  # À ajouter dans le projet cible
+```
+
+---
+
 ## Git
 
 | Règle | Valeur |

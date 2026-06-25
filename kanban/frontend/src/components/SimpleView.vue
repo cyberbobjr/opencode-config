@@ -1,13 +1,23 @@
 <script setup>
-import { reactive, watch } from 'vue'
+import { reactive, ref, watch } from 'vue'
 import draggable from 'vuedraggable'
 import KanbanCard from './KanbanCard.vue'
 import { SIMPLE_GROUPS } from '../constants.js'
 
+const DONE_PREVIEW = 8
+
 const props = defineProps({
-  stories: { type: Array, required: true },
+  stories:   { type: Array,   required: true },
+  noSession: { type: Boolean, default: false },
 })
 const emit = defineEmits(['move', 'open-modal', 'trigger'])
+
+const showAllDone = ref(false)
+
+function canMove(evt) {
+  if (!props.noSession) return true
+  return evt.from === evt.to
+}
 
 const localCols = reactive(
   Object.fromEntries(SIMPLE_GROUPS.map(g => [g.id, []]))
@@ -46,18 +56,52 @@ function handleChange(change, group) {
         </span>
       </div>
 
-      <!-- Draggable body -->
+      <!-- Done/Blocked column: static list with collapse -->
+      <template v-if="group.id === 'termine'">
+        <div class="flex-1 min-h-12 rounded-b-lg bg-slate-800/40 p-2 space-y-2 border border-t-0 border-slate-800">
+          <KanbanCard
+            v-for="story in (showAllDone ? localCols.termine : localCols.termine.slice(0, DONE_PREVIEW))"
+            :key="story.id"
+            :story="story"
+            :show-status="true"
+            :no-session="noSession"
+            @click="emit('open-modal', story.id)"
+            @trigger="emit('trigger', story.id)"
+            @move="(status) => emit('move', { id: story.id, status })"
+          />
+          <button
+            v-if="localCols.termine.length > DONE_PREVIEW"
+            class="w-full text-xs text-slate-500 hover:text-slate-300 py-1.5 transition-colors"
+            @click="showAllDone = !showAllDone"
+          >
+            {{ showAllDone
+              ? '↑ Réduire'
+              : `↓ Voir les ${localCols.termine.length - DONE_PREVIEW} autres` }}
+          </button>
+        </div>
+      </template>
+
+      <!-- All other columns: draggable -->
       <draggable
+        v-else
         v-model="localCols[group.id]"
         group="simple"
         item-key="id"
         class="flex-1 min-h-12 rounded-b-lg bg-slate-800/40 p-2 space-y-2 border border-t-0 border-slate-800"
         ghost-class="opacity-30"
         chosen-class="drag-chosen"
+        :move="canMove"
         @change="(e) => handleChange(e, group)"
       >
         <template #item="{ element }">
-          <KanbanCard :story="element" :show-status="true" @click="emit('open-modal', element.id)" @trigger="emit('trigger', element.id)" />
+          <KanbanCard
+            :story="element"
+            :show-status="true"
+            :no-session="noSession"
+            @click="emit('open-modal', element.id)"
+            @trigger="emit('trigger', element.id)"
+            @move="(status) => emit('move', { id: element.id, status })"
+          />
         </template>
       </draggable>
     </div>
