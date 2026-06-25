@@ -21,6 +21,7 @@ import fcntl
 import socket
 import time
 import atexit
+import subprocess
 from pathlib import Path
 from datetime import date, datetime
 from urllib.request import Request, urlopen
@@ -294,16 +295,57 @@ def _write_sessions(sessions: dict) -> None:
         json.dump(sessions, fh, indent=2)
 
 
+def _discover_opencode_port() -> int:
+    """Auto-discover the HTTP port of the parent OpenCode process.
+
+    Uses lsof to list TCP listening ports of the parent PID, then probes each
+    candidate against OpenCode's /session/status endpoint to confirm identity.
+    Falls back to the configured OPENCODE_PORT if discovery fails.
+    """
+    ppid = os.getppid()
+    try:
+        result = subprocess.run(
+            ["lsof", "-p", str(ppid), "-iTCP", "-sTCP:LISTEN", "-n", "-P"],
+            capture_output=True, text=True, timeout=3,
+        )
+        candidates: list[int] = []
+        for line in result.stdout.splitlines()[1:]:  # skip header
+            parts = line.split()
+            if len(parts) >= 9:
+                addr = parts[8]  # e.g. "*:4097" or "127.0.0.1:4097"
+                port_str = addr.rsplit(":", 1)[-1]
+                try:
+                    port = int(port_str)
+                    if 1024 <= port <= 65535:
+                        candidates.append(port)
+                except ValueError:
+                    pass
+
+        for port in candidates:
+            try:
+                with urlopen(f"http://localhost:{port}/session/status", timeout=1):
+                    log.info(f"  Auto-discovered OpenCode port: {port} (parent pid={ppid})")
+                    return port
+            except Exception:
+                pass
+    except Exception as e:
+        log.warning(f"  Port discovery failed: {e}")
+
+    log.info(f"  Using configured OPENCODE_PORT={OPENCODE_PORT} (discovery found nothing)")
+    return OPENCODE_PORT
+
+
 def _register_session() -> None:
+    port = _discover_opencode_port()
     with _sessions_lock:
         sessions = _read_sessions()
         sessions = {pid: info for pid, info in sessions.items() if _pid_alive(int(pid))}
         sessions[str(os.getpid())] = {
-            "opencode_port": OPENCODE_PORT,
+            "opencode_port": port,
             "started": datetime.now().isoformat(timespec="seconds"),
         }
         _write_sessions(sessions)
-    log.info(f"  Session registered: pid={os.getpid()} opencode_port={OPENCODE_PORT}")
+    log.info(f"  Session registered: pid={os.getpid()} opencode_port={port}")
 
 
 def _unregister_session() -> None:
