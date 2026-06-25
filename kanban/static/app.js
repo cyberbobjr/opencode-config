@@ -19,7 +19,7 @@
 
   const SIMPLE_GROUPS = [
     { id: "backlog",    label: "Backlog",         color: "#6b7280", statuses: ["pending"],                              dropTo: "pending"      },
-    { id: "en_cours",  label: "En cours",         color: "#3b82f6", statuses: ["refining", "secops_tm", "tdd", "secops_cr"], dropTo: "tdd"    },
+    { id: "en_cours",  label: "En cours",         color: "#3b82f6", statuses: ["refining", "secops_tm", "tdd", "secops_cr"], dropTo: "refining" },
     { id: "validation",label: "Validation",       color: "#ec4899", statuses: ["qa", "simplify"],                       dropTo: "qa"           },
     { id: "pret",      label: "Prêt",             color: "#10b981", statuses: ["commit_ready"],                         dropTo: "commit_ready" },
     { id: "termine",   label: "Terminé / Bloqué", color: "#065f46", statuses: ["completed", "blocked"],                 dropTo: "completed"    },
