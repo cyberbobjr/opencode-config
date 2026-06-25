@@ -1,6 +1,6 @@
 <script setup>
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
-import { loadConfig, loadOCStatus, loadStories, updateStory, moveStory, reorderStories, createStory, deleteStory, triggerStory } from './api.js'
+import { loadConfig, loadOCStatus, loadSessions, loadStories, updateStory, moveStory, reorderStories, createStory, deleteStory, triggerStory } from './api.js'
 import { STATUS_LABELS } from './constants.js'
 import StatsBar from './components/StatsBar.vue'
 import KanbanBoard from './components/KanbanBoard.vue'
@@ -20,9 +20,12 @@ const ocConnected   = ref(false)
 const toasts        = ref([])
 const loading       = ref(false)
 const appTitle      = ref('Kanban')
-const ocBusy        = ref(false)
-const ocTotal       = ref(0)
-const ocProcessing  = ref(0)
+const ocBusy             = ref(false)
+const ocTotal            = ref(0)
+const ocProcessing       = ref(0)
+const ocSessions         = ref({})
+const showSessionPopover = ref(false)
+const sessionBadgeRef    = ref(null)
 
 // ── Derived ───────────────────────────────────────────────────────────
 const filteredStories = computed(() => {
@@ -148,6 +151,27 @@ async function pollOCStatus() {
     ocTotal.value = 0
     ocProcessing.value = 0
   }
+  try {
+    ocSessions.value = await loadSessions()
+  } catch {
+    /* keep previous value */
+  }
+}
+
+function relativeTime(isoString) {
+  const diff = Date.now() - new Date(isoString).getTime()
+  const mins = Math.floor(diff / 60000)
+  if (mins < 1) return 'just now'
+  if (mins < 60) return `${mins}m ago`
+  const hours = Math.floor(mins / 60)
+  if (hours < 24) return `${hours}h ago`
+  return `${Math.floor(hours / 24)}d ago`
+}
+
+function handleOutsideClick(e) {
+  if (showSessionPopover.value && sessionBadgeRef.value && !sessionBadgeRef.value.contains(e.target)) {
+    showSessionPopover.value = false
+  }
 }
 
 // ── SSE ───────────────────────────────────────────────────────────────
@@ -168,10 +192,12 @@ onMounted(async () => {
   }
   await pollOCStatus()
   ocPollTimer = setInterval(pollOCStatus, 2000)
+  document.addEventListener('click', handleOutsideClick)
 })
 onUnmounted(() => {
   sse?.close()
   clearInterval(ocPollTimer)
+  document.removeEventListener('click', handleOutsideClick)
 })
 </script>
 
@@ -231,26 +257,72 @@ onUnmounted(() => {
         </button>
 
         <!-- OC sessions indicator -->
-        <div
-          class="flex items-center gap-2 text-xs px-2.5 py-1.5 rounded-lg border"
-          :class="ocConnected ? 'border-slate-700 text-slate-400' : 'border-slate-800 text-slate-600'"
-          :title="`${ocTotal} session(s) connected · ${ocProcessing} processing`"
-        >
-          <!-- connected dot -->
-          <span
-            class="w-2 h-2 rounded-full flex-shrink-0"
-            :class="ocConnected ? 'bg-emerald-400' : 'bg-slate-600'"
-          />
-          <!-- session count -->
-          <span>{{ ocTotal }}</span>
-          <!-- processing badge -->
-          <span
-            v-if="ocProcessing > 0"
-            class="flex items-center gap-1 text-amber-400 animate-pulse"
+        <div class="relative" ref="sessionBadgeRef">
+          <button
+            class="flex items-center gap-2 text-xs px-2.5 py-1.5 rounded-lg border transition-colors"
+            :class="ocConnected
+              ? 'border-slate-700 text-slate-400 hover:border-slate-600 hover:text-slate-300'
+              : 'border-slate-800 text-slate-600'"
+            :title="`${ocTotal} session(s) · ${ocProcessing} processing — click for details`"
+            @click.stop="showSessionPopover = !showSessionPopover"
           >
-            <i class="ti ti-loader-2 animate-spin" />
-            {{ ocProcessing }}
-          </span>
+            <!-- connected dot -->
+            <span
+              class="w-2 h-2 rounded-full flex-shrink-0"
+              :class="ocConnected ? 'bg-emerald-400' : 'bg-slate-600'"
+            />
+            <!-- session count -->
+            <span>{{ ocTotal }}</span>
+            <!-- processing badge -->
+            <span
+              v-if="ocProcessing > 0"
+              class="flex items-center gap-1 text-amber-400 animate-pulse"
+            >
+              <i class="ti ti-loader-2 animate-spin" />
+              {{ ocProcessing }}
+            </span>
+          </button>
+
+          <!-- Session popover -->
+          <div
+            v-if="showSessionPopover"
+            class="absolute right-0 top-full mt-1.5 z-50 w-72 bg-slate-800 border border-slate-700 rounded-lg shadow-xl p-3"
+          >
+            <p class="text-xs font-semibold text-slate-300 mb-2.5">OpenCode sessions</p>
+            <div v-if="Object.keys(ocSessions).length === 0" class="text-xs text-slate-500 italic">
+              No sessions found
+            </div>
+            <ul v-else class="flex flex-col gap-2">
+              <li
+                v-for="(info, pid) in ocSessions"
+                :key="pid"
+                class="flex items-center gap-2 text-xs"
+              >
+                <!-- routable dot -->
+                <span
+                  class="w-2 h-2 rounded-full flex-shrink-0"
+                  :class="info.routable ? 'bg-emerald-400' : 'bg-slate-500'"
+                  :title="info.routable ? 'Routable — dashboard can inject commands' : 'MCP only — launched without --port'"
+                />
+                <!-- PID -->
+                <span class="font-mono text-slate-300">{{ pid }}</span>
+                <!-- port / mode -->
+                <span
+                  class="px-1.5 py-0.5 rounded text-xs"
+                  :class="info.routable
+                    ? 'bg-emerald-900/40 text-emerald-400 border border-emerald-800'
+                    : 'bg-slate-700 text-slate-500 border border-slate-600'"
+                >
+                  {{ info.routable ? `:${info.opencode_port}` : 'MCP only' }}
+                </span>
+                <!-- start time -->
+                <span class="ml-auto text-slate-600 flex-shrink-0">{{ relativeTime(info.started) }}</span>
+              </li>
+            </ul>
+            <p class="text-xs text-slate-600 mt-2.5 pt-2 border-t border-slate-700">
+              <span class="inline-block w-2 h-2 rounded-full bg-emerald-400 mr-1 align-middle" />routable = pilotable from dashboard
+            </p>
+          </div>
         </div>
 
         <!-- New story -->

@@ -17,6 +17,10 @@ export function loadOCStatus() {
   return request('/opencode/status')
 }
 
+export function loadSessions() {
+  return request('/sessions')
+}
+
 export function loadStories() {
   return request('/stories')
 }
