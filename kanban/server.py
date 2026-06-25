@@ -17,7 +17,10 @@ import asyncio
 import threading
 import logging
 import copy
+import fcntl
+import socket
 import time
+import atexit
 from pathlib import Path
 from datetime import date, datetime
 from urllib.request import Request, urlopen
@@ -121,9 +124,17 @@ def _read_version() -> int:
 
 def bump_version() -> int:
     with _version_lock:
-        v = _read_version() + 1
-        VERSION_FILE.write_text(str(v))
-        return v
+        VERSION_FILE.touch(exist_ok=True)
+        with open(VERSION_FILE, "r+") as fh:
+            fcntl.flock(fh, fcntl.LOCK_EX)
+            try:
+                v = int(fh.read().strip() or "0") + 1
+            except ValueError:
+                v = 1
+            fh.seek(0)
+            fh.truncate()
+            fh.write(str(v))
+            return v
 
 
 # ── Story cache ──────────────────────────────────────────────────────
@@ -167,13 +178,12 @@ STATUS_COMMANDS = {
 }
 
 
-def _tui_type_and_submit(cmd: str) -> None:
+def _tui_type_and_submit(cmd: str, base: str) -> None:
     """Create a fresh OpenCode session, navigate to it, then submit cmd.
 
     Each kanban trigger starts in a clean context (0 prior messages) to avoid
     context-size blowup from accumulated session history.
     """
-    base = OPENCODE_SERVER_URL
     headers = {"Content-Type": "application/json"}
     try:
         # 1. Create a new blank session — returns {"id": "ses_...", ...}
@@ -200,18 +210,29 @@ def _tui_type_and_submit(cmd: str) -> None:
         toast = json.dumps({"title": "Kanban", "message": cmd, "variant": "info"}).encode()
         urlopen(Request(f"{base}/tui/show-toast", data=toast, headers=headers), timeout=3)
 
-        _debug({"step": "tui_submit", "command": cmd, "session_id": session_id, "ok": True})
-        log.info(f"  → TUI submitted in new session {session_id}: {cmd}")
+        _debug({"step": "tui_submit", "command": cmd, "session_id": session_id, "base": base, "ok": True})
+        log.info(f"  → TUI submitted in new session {session_id}: {cmd} → {base}")
     except Exception as e:
-        _debug({"step": "tui_submit", "command": cmd, "error": str(e)})
-        log.warning(f"  ⚠ TUI submit failed: {e}")
+        _debug({"step": "tui_submit", "command": cmd, "base": base, "error": str(e)})
+        log.warning(f"  ⚠ TUI submit failed ({base}): {e}")
 
 
-def trigger_opencode(story_id: str, command: str | None = None) -> dict:
-    """Inject a slash command into the active OpenCode TUI session.
+def _resolve_target_url(target_port: int | None) -> str:
+    """Return the OpenCode server URL to target.
 
-    Simulates the user typing the command and pressing Enter — no session ID needed.
-    The TUI endpoints target whatever session is currently displayed.
+    If target_port is given (from dashboard session selector), use it directly.
+    Otherwise use the configured OPENCODE_SERVER_URL.
+    """
+    if target_port:
+        return f"http://localhost:{target_port}"
+    return OPENCODE_SERVER_URL
+
+
+def trigger_opencode(story_id: str, command: str | None = None, target_port: int | None = None) -> dict:
+    """Inject a slash command into a specific OpenCode TUI session.
+
+    target_port: optional port chosen from the dashboard session selector.
+    Defaults to OPENCODE_PORT (configured in .opencode/.env).
     """
     if not OPENCODE_TRIGGER_ENABLED:
         _debug({"step": "trigger", "skipped": "disabled"})
@@ -221,12 +242,13 @@ def trigger_opencode(story_id: str, command: str | None = None) -> dict:
     if not cmd.startswith("/"):
         cmd = f"/{cmd}"
 
-    _debug({"step": "trigger", "story": story_id, "command": cmd})
-    log.info(f"  → Injecting into TUI: {cmd}")
+    base = _resolve_target_url(target_port)
+    _debug({"step": "trigger", "story": story_id, "command": cmd, "target": base})
+    log.info(f"  → Injecting into TUI: {cmd} → {base}")
 
-    threading.Thread(target=_tui_type_and_submit, args=(cmd,), daemon=True).start()
+    threading.Thread(target=_tui_type_and_submit, args=(cmd, base), daemon=True).start()
 
-    return {"triggered": True, "story_id": story_id, "command": cmd}
+    return {"triggered": True, "story_id": story_id, "command": cmd, "target": base}
 
 
 def find_stories_dir() -> Path:
@@ -243,6 +265,94 @@ def find_stories_dir() -> Path:
 
 STORIES_DIR = find_stories_dir()
 VERSION_FILE = STORIES_DIR.parent / ".kanban-version"
+SESSIONS_FILE = STORIES_DIR.parent / ".kanban-sessions.json"
+
+# ── Session registry (multi-instance) ───────────────────────────────
+_sessions_lock = threading.Lock()
+
+
+def _pid_alive(pid: int) -> bool:
+    try:
+        os.kill(pid, 0)
+        return True
+    except OSError:
+        return False
+
+
+def _read_sessions() -> dict:
+    try:
+        if SESSIONS_FILE.exists():
+            return json.loads(SESSIONS_FILE.read_text())
+    except Exception:
+        pass
+    return {}
+
+
+def _write_sessions(sessions: dict) -> None:
+    with open(SESSIONS_FILE, "w") as fh:
+        fcntl.flock(fh, fcntl.LOCK_EX)
+        json.dump(sessions, fh, indent=2)
+
+
+def _register_session() -> None:
+    with _sessions_lock:
+        sessions = _read_sessions()
+        sessions = {pid: info for pid, info in sessions.items() if _pid_alive(int(pid))}
+        sessions[str(os.getpid())] = {
+            "opencode_port": OPENCODE_PORT,
+            "started": datetime.now().isoformat(timespec="seconds"),
+        }
+        _write_sessions(sessions)
+    log.info(f"  Session registered: pid={os.getpid()} opencode_port={OPENCODE_PORT}")
+
+
+def _unregister_session() -> None:
+    with _sessions_lock:
+        sessions = _read_sessions()
+        sessions.pop(str(os.getpid()), None)
+        _write_sessions(sessions)
+
+
+atexit.register(_unregister_session)
+
+
+# ── HTTP auto-promotion (single dashboard across instances) ──────────
+_http_server_running = False
+_http_promote_lock = threading.Lock()
+
+
+def _port_is_free(port: int) -> bool:
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 0)
+    try:
+        s.bind(("", port))
+        s.close()
+        return True
+    except OSError:
+        s.close()
+        return False
+
+
+def _try_start_http() -> bool:
+    """Try to bind KANBAN_HTTP_PORT and start the HTTP server. Returns True if promoted."""
+    global _http_server_running
+    with _http_promote_lock:
+        if _http_server_running:
+            return True
+        if not _port_is_free(KANBAN_HTTP_PORT):
+            return False
+        _http_server_running = True
+    threading.Thread(target=run_http, daemon=True).start()
+    log.info(f"  HTTP dashboard promoted on :{KANBAN_HTTP_PORT}")
+    return True
+
+
+def _http_watchdog() -> None:
+    """Background thread: takes the HTTP port if it becomes free (e.g. master died)."""
+    while True:
+        time.sleep(10)
+        if not _http_server_running:
+            _try_start_http()
 
 
 def load_all() -> list[dict]:
@@ -274,14 +384,26 @@ def save_one(story_id: str, data: dict):
     data["updated_at"] = datetime.now().isoformat(timespec="seconds")
     for f in STORIES_DIR.glob("*.json"):
         try:
-            if json.loads(f.read_text())["id"] == story_id:
-                f.write_text(json.dumps(data, indent=2, ensure_ascii=False))
-                bump_version()
-                return
-        except (json.JSONDecodeError, KeyError):
+            with open(f, "r+") as fh:
+                fcntl.flock(fh, fcntl.LOCK_EX)
+                try:
+                    existing = json.load(fh)
+                except json.JSONDecodeError:
+                    continue
+                if existing.get("id") != story_id:
+                    continue
+                fh.seek(0)
+                fh.truncate()
+                json.dump(data, fh, indent=2, ensure_ascii=False)
+            bump_version()
+            return
+        except (KeyError, OSError):
             pass
     sid = story_id.lower().replace(" ", "-").replace(".", "-")
-    (STORIES_DIR / f"{sid}.json").write_text(json.dumps(data, indent=2, ensure_ascii=False))
+    target = STORIES_DIR / f"{sid}.json"
+    with open(target, "w") as fh:
+        fcntl.flock(fh, fcntl.LOCK_EX)
+        json.dump(data, fh, indent=2, ensure_ascii=False)
     bump_version()
 
 
@@ -416,7 +538,7 @@ def api_get(sid: str):
 
 
 @rest.put("/api/stories/{sid}")
-def api_update(sid: str, body: dict, no_trigger: bool = False):
+def api_update(sid: str, body: dict, no_trigger: bool = False, target_port: int | None = None):
     s = load_one(sid)
     if not s:
         raise HTTPException(404, f"Story {sid} not found")
@@ -427,7 +549,7 @@ def api_update(sid: str, body: dict, no_trigger: bool = False):
     if not no_trigger and new_status != old_status and new_status in STATUS_COMMANDS:
         cmd_name, cmd_args = STATUS_COMMANDS[new_status](sid)
         cmd_str = f"/{cmd_name} {cmd_args}"
-        trigger_result = trigger_opencode(sid, command=cmd_str)
+        trigger_result = trigger_opencode(sid, command=cmd_str, target_port=target_port)
         return {**s, "_trigger": trigger_result}
     return s
 
@@ -469,7 +591,7 @@ def api_create(body: dict):
 
 
 @rest.patch("/api/stories/{sid}/move")
-def api_move_story(sid: str, body: dict, no_trigger: bool = False):
+def api_move_story(sid: str, body: dict, no_trigger: bool = False, target_port: int | None = None):
     """Move a story to a new status. Body: {status, actor?}. Triggers OpenCode if applicable."""
     new_status = body.get("status")
     actor = body.get("actor", "dashboard")
@@ -491,7 +613,7 @@ def api_move_story(sid: str, body: dict, no_trigger: bool = False):
     if not no_trigger and new_status != old_status and new_status in STATUS_COMMANDS:
         cmd_name, cmd_args = STATUS_COMMANDS[new_status](sid)
         cmd_str = f"/{cmd_name} {cmd_args}"
-        trigger_result = trigger_opencode(sid, command=cmd_str)
+        trigger_result = trigger_opencode(sid, command=cmd_str, target_port=target_port)
         return {**s, "_trigger": trigger_result}
     return s
 
@@ -505,7 +627,7 @@ def api_reload():
 
 
 @rest.post("/api/stories/{sid}/trigger")
-def api_trigger(sid: str):
+def api_trigger(sid: str, target_port: int | None = None):
     """Fire the OpenCode command for the story's current status, without moving it."""
     s = load_one(sid)
     if not s:
@@ -515,8 +637,21 @@ def api_trigger(sid: str):
         raise HTTPException(400, f"No command defined for status '{status}'")
     cmd_name, cmd_args = STATUS_COMMANDS[status](sid)
     cmd_str = f"/{cmd_name} {cmd_args}"
-    result = trigger_opencode(sid, command=cmd_str)
+    result = trigger_opencode(sid, command=cmd_str, target_port=target_port)
     return {"ok": True, "command": cmd_str, "trigger": result}
+
+
+@rest.get("/api/sessions")
+def api_sessions():
+    """Return registered OpenCode sessions (for dashboard session selector).
+    Dead sessions (process no longer running) are pruned on read.
+    """
+    with _sessions_lock:
+        sessions = _read_sessions()
+        alive = {pid: info for pid, info in sessions.items() if _pid_alive(int(pid))}
+        if len(alive) != len(sessions):
+            _write_sessions(alive)
+    return alive
 
 
 @rest.delete("/api/stories/{sid}")
@@ -873,8 +1008,10 @@ def run_http():
 
 
 def run_mcp():
-    t = threading.Thread(target=run_http, daemon=True)
-    t.start()
+    _register_session()
+    if not _try_start_http():
+        log.info(f"  Port {KANBAN_HTTP_PORT} taken — MCP-only mode, watchdog active")
+        threading.Thread(target=_http_watchdog, daemon=True).start()
     import asyncio
     from mcp.server.stdio import stdio_server
 
