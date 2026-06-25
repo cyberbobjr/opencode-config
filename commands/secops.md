@@ -131,7 +131,10 @@ Thin wrapper that assembles context and delegates the audit to the isolated `sec
 
 1. Run `git diff HEAD` and capture the full output
 2. Call `kanban-get-story("[story_id]")` to retrieve the full story (stack, implementation_guide)
-3. Read `AGENTS.md` — extract: stack info, backend/frontend paths, dependency audit command
+3. Read the following files and extract:
+   - `AGENTS.md` — stack info (Identité table)
+   - `.opencode/rules/conventions.md` — backend/frontend paths and conventions
+   - `.opencode/rules/commands.md` — dependency audit command if applicable
 
 ### Phase 2: Launch SecOps-CR Subagent
 
@@ -149,8 +152,8 @@ STORY JSON:
 GIT DIFF:
 [paste the full output of git diff HEAD]
 
-AGENTS.MD CONVENTIONS:
-[paste the relevant AGENTS.md sections: stack, backend/frontend paths, dependency audit command]
+PROJECT CONVENTIONS:
+[paste: stack info from AGENTS.md + backend/frontend paths from .opencode/rules/conventions.md + dependency audit command from .opencode/rules/commands.md]
 
 Instructions:
 - Audit the modified code against the OWASP checklist

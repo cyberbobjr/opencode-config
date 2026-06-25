@@ -35,8 +35,8 @@ argument:
 
 ## General Rules
 
-- ✅ **Read `AGENTS.md`** for project conventions, commands, and quality gates
-- ✅ **Read the design system reference** (defined in `AGENTS.md`) before any frontend implementation
+- ✅ **Read `AGENTS.md`** for project conventions and quality gates — detailed commands in `.opencode/rules/commands.md`
+- ✅ **Read the design system reference** (`docs/design-system.md`, tokens résumés dans `.opencode/rules/conventions.md`) before any frontend implementation
 - ✅ **Use the Kanban server MCP tools** (`kanban-get-story`, `kanban-list-stories`, `kanban-update-story`, `kanban-move-story`, `kanban-create-story`, `kanban-get-next-pending`, `kanban-get-stats`) — all story data lives in `user-stories/*.json` served by the server
 - ✅ **Delegate refinement to `/refine US X.Y`** — do not do it yourself
 - ❌ **Never modify `user-stories/*.json` files directly** — use the MCP tools
@@ -111,7 +111,7 @@ Execute each step **actively and sequentially**.
    - RED: write the tests (they fail)
    - GREEN: implement the minimum code
    - REFACTOR: clean up without breaking tests
-   - Quality gates: run the commands defined in `AGENTS.md` for the impacted stack
+   - Quality gates: run the commands defined in `.opencode/rules/commands.md` (section "Quality Gates") for the impacted stack
 4. Summary: call `kanban-update-story(...)` with TDD results
 5. Display the TDD report (tests, coverage, files)
 6. **Branch based on result:**
@@ -165,7 +165,7 @@ Execute each step **actively and sequentially**.
 
 **Step 4 — Quality Gates**
 
-1. Run the commands listed in `AGENTS.md` section "Before each push / PR"
+1. Run the commands listed in `.opencode/rules/commands.md` section "Quality Gates" → "Avant chaque push / PR"
 2. Run `/simplify US X.Y` — passes the story ID so the report is written to the story
    > ⚠️ **Orchestrator context**: after /simplify completes, do NOT ask about advancing — next-story moves to `commit_ready` and asks about the commit.
 3. Fix any issues found
@@ -246,7 +246,7 @@ Run quality gates for the story and move it to `commit_ready` when all pass.
 Used when the dashboard moves a card to the `simplify` column.
 
 1. Retrieve context via `kanban-get-story("US X.Y")`
-2. Run the commands listed in `AGENTS.md` section "Before each push / PR"
+2. Run the commands listed in `.opencode/rules/commands.md` section "Quality Gates" → "Avant chaque push / PR"
 3. Run `/simplify US X.Y` — passes the story ID so the report is written to the story
    > ⚠️ **Orchestrator context**: after /simplify completes, do NOT ask about advancing — next-story moves to `commit_ready` and displays the summary.
 4. Fix any issues found
@@ -280,7 +280,7 @@ Used when the dashboard moves a card to the `simplify` column.
 
 ---
 
-The full workflow in `AGENTS.md` (section "Recommended workflow for each story") describes the optimal cycle. The fastest path remains:
+The full workflow in `.opencode/rules/workflow.md` (section "Cycle d'une Story") describes the optimal cycle. The fastest path remains:
 
 ```
 /next-story US X.Y

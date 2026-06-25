@@ -12,7 +12,9 @@ Thin orchestrator wrapper that assembles context and delegates validation to the
 ## Phase 1: Gather Context
 
 1. Call `kanban-get-story("$ARGUMENTS")` to retrieve the full story (ACs, implementation_guide, tdd report, description)
-2. Read `AGENTS.md` — extract the relevant sections: test run commands, stack info, E2E tool, quality gate commands
+2. Read the following files and extract the relevant sections:
+   - `AGENTS.md` — stack info (Identité table)
+   - `.opencode/rules/commands.md` — test run commands, E2E tool (`npx playwright test`), quality gate commands
 
 ## Phase 2: Launch QA Subagent
 
@@ -27,8 +29,8 @@ is_orchestrated: false
 STORY JSON:
 [paste the full JSON returned by kanban-get-story]
 
-AGENTS.MD CONVENTIONS:
-[paste the relevant AGENTS.md sections: test commands, stack, E2E tool]
+PROJECT CONVENTIONS:
+[paste: stack info from AGENTS.md + test/E2E/quality gate commands from .opencode/rules/commands.md]
 
 Instructions:
 - Validate all acceptance criteria for this story through integration and E2E tests

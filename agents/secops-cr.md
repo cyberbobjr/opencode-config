@@ -19,7 +19,7 @@ Parse these fields from the injected context:
 | `is_orchestrated` | `true` if launched from `/next-story` (do NOT ask about advancing); `false` if standalone |
 | `story_json` | Full story object (ACs, implementation_guide, stack) |
 | `git_diff` | Output of `git diff HEAD` at the time of invocation |
-| `agents_md` | Relevant sections from AGENTS.md (stack, dependency audit command, backend/frontend paths) |
+| `agents_md` | Project conventions: stack (AGENTS.md) + backend/frontend paths (.opencode/rules/conventions.md) + dependency audit command (.opencode/rules/commands.md) |
 
 ## Output Protocol
 

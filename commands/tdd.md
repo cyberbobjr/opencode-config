@@ -12,7 +12,10 @@ Thin orchestrator wrapper that assembles context and delegates implementation to
 ## Phase 1: Gather Context
 
 1. Call `kanban-get-story("$ARGUMENTS")` to retrieve the full story (ACs, implementation_guide, description, stack)
-2. Read `AGENTS.md` — extract the relevant sections: test run commands, stack info, quality gate commands, design system reference
+2. Read the following files and extract the relevant sections:
+   - `AGENTS.md` — stack info (Identité table)
+   - `.opencode/rules/commands.md` — test run commands, quality gate commands
+   - `.opencode/rules/conventions.md` — design system reference (points to `docs/design-system.md`)
 
 ## Phase 2: Launch TDD Subagent
 
@@ -28,8 +31,8 @@ is_orchestrated: false
 STORY JSON:
 [paste the full JSON returned by kanban-get-story]
 
-AGENTS.MD CONVENTIONS:
-[paste the relevant AGENTS.md sections: test commands, stack, quality gate commands, design system if frontend]
+PROJECT CONVENTIONS:
+[paste: stack info from AGENTS.md + test/quality gate commands from .opencode/rules/commands.md + design system ref from .opencode/rules/conventions.md if frontend]
 
 Instructions:
 - Run the full Red-Green-Refactor cycle for this story

@@ -21,7 +21,7 @@ Parse these fields from the injected context:
 | `mode` | `full-cycle` (default) or `fix-failing-acs` (after QA failure) |
 | `is_orchestrated` | `true` if launched from `/next-story` (do NOT ask about advancing); `false` if standalone |
 | `story_json` | Full story object (ACs, implementation_guide, description, stack) |
-| `agents_md` | Relevant sections from AGENTS.md (test commands, stack, quality gates) |
+| `agents_md` | Project conventions: stack (AGENTS.md) + test/quality gate commands (.opencode/rules/commands.md) + design system (.opencode/rules/conventions.md if frontend) |
 | `ac_failing` | List of failed ACs with diagnosis — only present in `fix-failing-acs` mode |
 
 ## Output Protocol
@@ -74,8 +74,9 @@ You must also update the story via the Kanban MCP tools throughout execution (se
    - `constraints` → rules not to break
    - Type-specific sections (`data_model`, `api_contracts`, `devops_changes`…)
 6. **If `implementation_guide` is absent** — explore the existing code to infer the approach
-7. **If type includes `frontend`** — read the design system reference defined in `AGENTS.md`
-8. Announce the plan: list the files you will create/modify before starting
+7. **Check for E2E requirements**: scan `acceptance_criteria` for text containing `[E2E]`. Set `has_e2e = true` if ANY of: (a) at least one AC contains `[E2E]`, (b) the story type includes `frontend`, (c) the `stack` field includes `frontend`. If `[E2E]` is missing on frontend ACs that clearly involve a page or user flow, tag them — E2E tests are MANDATORY for all frontend stories
+8. **If type includes `frontend`** — read the design system: `docs/design-system.md` (full spec) and tokens summary in `.opencode/rules/conventions.md` section "Frontend"
+9. Announce the plan: list the files you will create/modify before starting
 
 ---
 
@@ -89,7 +90,7 @@ Adapt the test type to the story domain:
 | `backend` — API endpoint | Integration | stack test tool + HTTP test client |
 | `backend` — background worker | Integration | stack test tool + broker mock |
 | `frontend` — component | Component | frontend test tool (see agents_md) |
-| `frontend` — page / flow | E2E | E2E test tool (see agents_md) |
+| `frontend` — page / flow | E2E | Playwright (`npm run test:e2e`) |
 | `database` — migration | DB integration | stack test tool + test DB |
 | `devops` / `infrastructure` | Smoke test | bash script or stack test tool |
 | `architecture` — refactoring | Existing tests (must not break) | per stack |
@@ -103,6 +104,22 @@ General rules:
 - Naming: `test_<feature>_<scenario>` (e.g. `test_auth_register_success`)
 - Mock external dependencies (message brokers, graph databases, SMTP, payment services, third-party APIs)
 - **In fix mode**: read the QA error (file, line, message) to guide the correction
+
+**Playwright E2E tests — MANDATORY for all frontend stories**:
+If `has_e2e = true` (step 1.7):
+1. Create at minimum one Playwright test file per feature: `src/<feature>.e2e.ts`
+2. For each AC tagged `[E2E]` (or for the main user flow if no explicit `[E2E]` tag), write a test:
+   ```typescript
+   import { test, expect } from "@playwright/test"
+   test("<feature> <scenario>", async ({ page }) => {
+     // Mock API calls via page.route() interceptors
+     // Navigate and assert
+   })
+   ```
+3. Use `page.route()` to intercept and mock ALL API calls the page makes — no real backend needed
+4. **Tests aux bornes obligatoires** : au moins un test nominal (succès) + un test d'erreur (timeout, 4xx, 5xx, données vides)
+5. Run with `npm run test:e2e` (must fail at RED stage)
+6. File naming convention: `*.e2e.ts` (auto-discovered by playwright.config.ts)
 
 ---
 
@@ -131,7 +148,7 @@ Run **only the relevant checks** for the story type. Use commands from `agents_m
 General categories to cover:
 
 - **Backend** — lint, type check, unit + integration tests
-- **Frontend** — lint, type check, component tests, E2E
+- **Frontend** — lint, type check, component tests (`npm run test:unit`), and E2E (`npm run test:e2e`) — ⚠️ MANDATORY for any frontend story
 - **DevOps / Infrastructure** — validate config syntax, verify images build
 - **Database (migration)** — check migration consistency, apply on test DB, verify rollback
 - **Docs** — verify links are not broken, code examples compile

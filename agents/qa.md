@@ -20,7 +20,7 @@ Parse these fields from the injected context:
 | `story_id` | e.g. "US 1.3" |
 | `is_orchestrated` | `true` if launched from `/next-story` (do NOT ask about advancing); `false` if standalone |
 | `story_json` | Full story object (ACs, implementation_guide, description, tdd report) |
-| `agents_md` | Relevant sections from AGENTS.md (test commands, stack, E2E tool) |
+| `agents_md` | Project conventions: stack (AGENTS.md) + test/E2E/quality gate commands (.opencode/rules/commands.md) |
 
 ## Output Protocol
 
@@ -74,12 +74,32 @@ For each acceptance criterion, determine the required test type:
 | Business behavior | Integration | stack test tool + test DB |
 | Frontend display rule | Component | frontend test tool (see agents_md) |
 | Complete user journey | E2E | E2E test tool (see agents_md) |
+| AC text contains `[E2E]`, `"E2E test:"`, or `"E2E:"` | E2E | E2E test tool (see agents_md) |
 | Background worker / queue | Integration | stack test tool + broker mock |
 
 For each AC, write a test that:
 1. **Explicitly verifies the behavior described in the AC**
 2. Tests the nominal case (success) AND the error case (failure) where applicable
 3. Includes a clear assertion of the expected result
+
+### 2bis. Verify E2E test files exist on disk (⚠️ MANDATORY)
+
+**For every AC** whose text contains `[E2E]`, `"E2E test:"`, or `"E2E:"`:
+
+1. Use `glob("frontend/src/**/*.e2e.ts")` to discover existing Playwright test files
+2. If no `*.e2e.ts` files exist at all → this AC **must fail** — the test file was never created
+3. If the glob finds files, verify that at least one test covers the specific scenario described in the AC
+4. For missing coverage, produce:
+   ```
+   ac_id: "AC X"
+   title: "<AC text>"
+   test_failing: "No .e2e.ts file exists"
+   assertion: "Playwright E2E test should exist for this scenario"
+   file: "frontend/src/<feature>.e2e.ts"
+   cause: "E2E test file not created during TDD — QA stub required or story must return to TDD"
+   ```
+
+> **Note:** Do NOT create the E2E test yourself — QA only validates. If absent, fail the AC so the story returns to TDD for corrective mode.
 
 ### 3. Write and run tests
 
@@ -91,6 +111,16 @@ Each test must include a comment indicating which AC it covers:
 async def test_register_returns_verification_message(client):
     ...
 ```
+
+### 3bis. Checkpoint — coverage confirmed (⚠️ MANDATORY)
+
+⚠️ **MANDATORY**: You MUST confirm every AC has a test before persisting.
+
+For E2E ACs specifically:
+- Re-run `glob("frontend/src/**/*.e2e.ts")` to confirm the Playwright test file physically exists
+- If any E2E AC lacks a corresponding `*.e2e.ts` file on disk → mark it as failed, do NOT create it yourself
+
+If any AC is untested or missing its test file, write the missing test now (for unit/integration) or fail the AC (for E2E). Do NOT proceed to section 5 until coverage is complete.
 
 ### 4. AC coverage report
 
@@ -114,15 +144,21 @@ cause        = "middleware checks expiration before refresh"
 
 ### 5. Persist and report
 
-1. **Check each AC** — retrieve the full AC list from `story_json.acceptance_criteria`, then update with results:
+1. **Update individual ACs (⚠️ MANDATORY — do NOT skip)** — You MUST update every individual AC's `checked` flag before updating `qa.status`. This is a hard requirement; the previous QA agent ran multiple times without doing it.
+
+   Rule: `checked: true` if and only if the test covering that AC passes AND (for E2E ACs) the Playwright test file physically exists on disk. `checked: false` if the AC's test fails or the E2E file is missing.
+
+   Special rule for E2E ACs: `checked` must remain `false` if no `*.e2e.ts` file exists on disk — even if you wrote unit/component tests that partially validate the behavior. Only a real Playwright E2E test qualifies.
+
+   Retrieve the full AC list from `story_json.acceptance_criteria`, then call:
    ```
    kanban-update-story("[story_id]", '{"_actor": "qa", "acceptance_criteria": [
      {"id": 1, "text": "...", "checked": true},
      {"id": 2, "text": "...", "checked": true},
-     {"id": 3, "text": "...", "checked": false}
+     {"id": 3, "text": "...", "checked": false},
+     {"id": 12, "text": "E2E test: ...", "checked": false}
    ]}')
    ```
-   Rule: `checked: true` if and only if the test covering that AC passes.
 
 2. Mark `qa.status = passed` or `failed`:
    ```
@@ -132,18 +168,20 @@ cause        = "middleware checks expiration before refresh"
    # Failure:
    kanban-update-story("[story_id]", '{"_actor": "qa", "qa": {"status": "failed", "ac_covered": "6/8", "notes": "ACs 3, 7 failed", "ac_failures": [{"ac_id": "AC 3", "title": "...", "test_failing": "...", "assertion": "...", "file": "...", "cause": "..."}]}}')
    ```
-   The `ac_failures` list is used by TDD in `fix-failing-acs` mode.
+    The `ac_failures` list is used by TDD in `fix-failing-acs` mode.
 
-3. **Advance:**
+3. **Verify ACs were persisted (⚠️ MANDATORY)** — Call `kanban-get-story("[story_id]")` and confirm the `acceptance_criteria` array has `checked: true` for every passing AC. If they are still `false`, re-attempt step 1 before proceeding.
+
+4. **Advance:**
    - If `failed` → return the failure report. The caller handles the stop.
    - If `passed` and `is_orchestrated = true` → return the report only. Do NOT ask about advancing. The orchestrator handles `kanban-move-story` to `simplify`.
    - If `passed` and `is_orchestrated = false` → include in the report:
      ```
      ✅ QA passed — [N/N] ACs covered. Proceed to quality gates (simplify)? [yes / no]
      ```
-     The wrapper command reads this and acts accordingly.
+    The wrapper command reads this and acts accordingly.
 
-4. Return the full structured QA report.
+5. Return the full structured QA report.
 
 ---
 

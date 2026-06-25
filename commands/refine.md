@@ -138,6 +138,10 @@ Write **only the relevant sections** for the detected type. Do not generate empt
 - API calls: consumed endpoint, loading/error handling
 - Design system: CSS tokens and reference components (see `AGENTS.md`)
 - Sequence: store → component → page → tests
+- **E2E tests (Playwright + mock API via `page.route()`) — ⚠️ MANDATORY**
+  - Chaque AC couvrant une page ou un flux utilisateur DOIT être tagué `[E2E]`
+  - Minimum 1 test nominal + tests aux bornes (validation d'erreur, cas vides, timeouts)
+  - Le mock API doit couvrir tous les appels backend du scénario testé
 
 **For `database`:**
 - Schema before / after (columns, types, constraints, indexes)
@@ -208,7 +212,7 @@ kanban-update-story("$ARGUMENTS", '{
   "description": "## User Story\n**En tant que** [rôle], je veux [fonctionnalité], afin de [bénéfice].\n\n## Contexte\n[Refined context after dialogue.]\n\n## Décisions clés\n- [Decision 1]\n- [Decision 2]",
   "stack": ["backend", "database"],
   "acceptance_criteria": [
-    {"id": 1, "text": "Revised AC 1", "checked": false},
+    {"id": 1, "text": "Revised AC 1 [E2E]", "checked": false},
     {"id": 2, "text": "Revised AC 2", "checked": false}
   ],
   "refine_decisions": [
@@ -236,7 +240,7 @@ kanban-update-story("$ARGUMENTS", '{
       "1. First step",
       "2. Second step"
     ],
-    "test_strategy": "What to test, which test type (unit/integration/e2e/smoke), which tool",
+    "test_strategy": "What to test, which test type (unit/integration/e2e/smoke), which tool. For frontend stories: E2E tests (Playwright + mocked API) are ⚠️ MANDATORY — au moins 1 test nominal + tests aux bornes",
     "constraints": "What not to do, imposed patterns, performance thresholds"
   }
 }')
