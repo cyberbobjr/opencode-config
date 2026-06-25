@@ -81,8 +81,8 @@ Un build Storybook en échec **bloque** le passage en `commit_ready`.
 | Règle | Détail |
 |-------|--------|
 | **Interdiction** | `<input>`, `<select>`, `<button>`, `<textarea>` sont **interdits** dans tout fichier `.vue` hors de `components/ui/` |
-| **Détection** | La règle ESLint `newscap/no-raw-html-elements` bloque ces violations (erreur bloquante) |
-| **Audit** | Le script `scripts/audit-storybook-usage.py` génère un rapport de toutes les violations |
+| **Détection** | La règle ESLint `newscap/no-raw-html-elements` bloque ces violations (erreur bloquante) — à configurer dans le projet cible |
+| **Audit** | _(optionnel — projet-spécifique)_ Un script `scripts/audit-storybook-usage.py` peut être ajouté pour générer un rapport de violations |
 | **Composants manquants** | Si un composant Storybook n'existe pas pour un besoin UI → créer une US dédiée dans le catalogue, ne pas utiliser de HTML natif en attendant |
 | **Composants composites** | Les composants composites (CountryThemeSelector, DeliveryTimeSelector, DetailLevelSelector, ChipInput, etc.) doivent utiliser les primitives Storybook |
 
@@ -109,7 +109,7 @@ Si vous avez besoin d'un élément d'interface qui n'a pas d'équivalent Storybo
 
 ```bash
 cd frontend && npx eslint src                # Bloque les violations
-python scripts/audit-storybook-usage.py --exit-code  # Vérification complémentaire
+# python scripts/audit-storybook-usage.py --exit-code  # À ajouter dans le projet cible
 ```
 
 ---

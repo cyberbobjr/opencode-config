@@ -85,8 +85,8 @@ cd frontend && npx eslint src && npx prettier --check src && npx vue-tsc --noEmi
 cd backend && pytest --cov=app --cov-report=term-missing --cov-fail-under=80
 cd frontend && npx vitest --coverage --coverage.threshold.100.branches=80
 npm run test:ui-int
-python scripts/audit-storybook-usage.py --exit-code  # Bloque si violations Storybook
-cd frontend && npx storybook build --quiet            # Bloque si erreur Storybook
+# python scripts/audit-storybook-usage.py --exit-code  # À ajouter dans le projet cible (script non inclus dans ce template)
+# cd frontend && npx storybook build --quiet            # À adapter selon la structure du projet cible
 ```
 
 ## Déploiement

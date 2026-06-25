@@ -6,3 +6,6 @@ bun.lock
 kanban/kanban.log
 kanban/__pycache__/
 kanban/*.pyc
+
+# Local env — never commit, use .env.example instead
+.env

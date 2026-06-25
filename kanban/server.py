@@ -21,7 +21,6 @@ import fcntl
 import socket
 import time
 import atexit
-import subprocess
 from pathlib import Path
 from datetime import date, datetime
 from urllib.request import Request, urlopen
@@ -309,15 +308,21 @@ def _pid_alive(pid: int) -> bool:
 def _read_sessions() -> dict:
     try:
         if SESSIONS_FILE.exists():
-            return json.loads(SESSIONS_FILE.read_text())
+            with open(SESSIONS_FILE, "r") as fh:
+                fcntl.flock(fh, fcntl.LOCK_SH)
+                return json.loads(fh.read())
     except Exception:
         pass
     return {}
 
 
 def _write_sessions(sessions: dict) -> None:
-    with open(SESSIONS_FILE, "w") as fh:
+    # Open without truncation, acquire lock first, then truncate under the lock
+    # to avoid a race window where readers see an empty file.
+    with open(SESSIONS_FILE, "a+") as fh:
         fcntl.flock(fh, fcntl.LOCK_EX)
+        fh.seek(0)
+        fh.truncate()
         json.dump(sessions, fh, indent=2)
 
 
@@ -438,7 +443,16 @@ def _try_start_http() -> bool:
         if not _port_is_free(KANBAN_HTTP_PORT):
             return False
         _http_server_running = True
-    threading.Thread(target=run_http, daemon=True).start()
+
+    def _run_and_reset():
+        global _http_server_running
+        try:
+            run_http()
+        finally:
+            # Reset so the watchdog can attempt re-promotion if uvicorn exits
+            _http_server_running = False
+
+    threading.Thread(target=_run_and_reset, daemon=True).start()
     log.info(f"  HTTP dashboard promoted on :{KANBAN_HTTP_PORT}")
     return True
 
@@ -1120,9 +1134,11 @@ def run_http():
 
 def run_mcp():
     _register_session()
+    # Watchdog starts unconditionally so re-promotion works even if initial
+    # promotion appears to succeed but uvicorn exits immediately (bind race).
+    threading.Thread(target=_http_watchdog, daemon=True).start()
     if not _try_start_http():
         log.info(f"  Port {KANBAN_HTTP_PORT} taken — MCP-only mode, watchdog active")
-        threading.Thread(target=_http_watchdog, daemon=True).start()
     import asyncio
     from mcp.server.stdio import stdio_server
 

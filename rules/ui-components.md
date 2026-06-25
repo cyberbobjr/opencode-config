@@ -2,6 +2,9 @@
 
 ## Référence visuelle (TOUJOURS consulter en premier)
 
+> **Note pour ce template** : Les fichiers de référence ci-dessous sont spécifiques au projet cible.
+> Remplacez ces chemins par les fichiers de design de votre projet, ou supprimez cette section si elle ne s'applique pas.
+
 Avant d'implémenter tout composant ou page, ouvre et consulte le fichier de référence :
 - `docs/designs/d-hybrid.html` — rendu complet dashboard + landing (design retenu)
 - `docs/designs/landing.html` — landing page seule

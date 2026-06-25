@@ -28,7 +28,7 @@ const showSessionPopover = ref(false)
 const sessionBadgeRef    = ref(null)
 
 // ── Derived ───────────────────────────────────────────────────────────
-const noSession = computed(() => ocTotal.value === 0)
+const noSession = computed(() => !Object.values(ocSessions.value).some(s => s.routable))
 
 const filteredStories = computed(() => {
   const q = searchQuery.value.trim().toLowerCase()
