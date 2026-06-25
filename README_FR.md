@@ -162,10 +162,12 @@ cp .opencode/.env.example .opencode/.env
 ```bash
 # .opencode/.env
 KANBAN_HTTP_PORT=8765   # port du dashboard et de l'API REST
-OPENCODE_PORT=4096      # doit correspondre à --port passé à opencode
+OPENCODE_PORT=4096      # port de repli — psutil détecte automatiquement le port parent en multi-instance
 ```
 
 Le fichier `.opencode/.env` est chargé au démarrage du serveur. Les variables d'environnement du shell ont priorité sur le fichier.
+
+> **Note multi-instance** : avec plusieurs instances OpenCode, `OPENCODE_PORT` n'est utilisé qu'en dernier recours. Le serveur découvre le bon port en inspectant les sockets TCP du processus parent via `psutil` — aucune configuration `.env` par instance n'est nécessaire.
 
 > ⚠️ **Le fichier `.opencode/.env` est gitignore** (couvert par la règle `.env` à la racine). Ne le committez jamais — il peut contenir des valeurs locales.
 
@@ -188,7 +190,7 @@ Au démarrage, le sous-processus serveur Kanban tente de lier `KANBAN_HTTP_PORT`
 
 Le dashboard reste accessible sur `http://localhost:8765` tant qu'au moins une instance tourne.
 
-### Registre de sessions
+### Registre de sessions et découverte de port
 
 Chaque instance s'enregistre dans `.kanban-sessions.json` à la racine du projet au démarrage et se désinscrit à l'arrêt propre. Les PIDs morts sont purgés automatiquement à chaque lecture de `/api/sessions`.
 
@@ -200,7 +202,18 @@ Chaque instance s'enregistre dans `.kanban-sessions.json` à la racine du projet
 }
 ```
 
-Le champ `routable` vaut `true` uniquement si un serveur HTTP OpenCode était joignable au démarrage. Les instances lancées sans `--port` sont enregistrées avec `routable: false` et `opencode_port: null` — le dashboard les voit mais ne peut pas y injecter de commandes.
+Le champ `routable` vaut `true` uniquement si un serveur HTTP OpenCode était joignable au démarrage. Les instances lancées sans `--port` sont enregistrées avec `routable: false` et `opencode_port: null`.
+
+**Découverte du port** : la bibliothèque `psutil` inspecte les sockets TCP en écoute du processus parent (PPID) directement. C'est le seul mécanisme fiable quand plusieurs instances tournent sur des ports différents — chaque sous-processus Kanban trouve le port exact de *son propre* OpenCode sans deviner. `psutil` est donc une dépendance obligatoire (`pip install -r .opencode/kanban/requirements.txt`). Le `OPENCODE_PORT` du `.env` n'est utilisé qu'en repli si l'inspection du processus échoue.
+
+### Routage des commandes
+
+Quand une action manuelle du dashboard (déplacement de carte, bouton trigger) doit atteindre une instance OpenCode, le serveur sélectionne automatiquement la meilleure session disponible :
+
+1. **Préfère une session idle** — une instance routable qui ne traite pas de commande en ce moment
+2. **Repli vers n'importe quelle session routable** si toutes sont occupées
+
+Déplacer deux cartes rapidement distribue donc naturellement les commandes entre vos instances. Les commandes émises par les agents via les outils MCP (`kanban-move-story`) court-circuitent ce routage — elles n'injectent pas de commande slash.
 
 ### Indicateur de sessions dans le dashboard
 
@@ -210,7 +223,9 @@ L'en-tête du dashboard affiche un badge de sessions en temps réel :
 - **N** — nombre total de sessions vivantes
 - **⟳ P** — badge ambre animé indiquant combien de sessions traitent une commande (visible seulement si P > 0)
 
-Cliquer sur le badge ouvre un popover avec les détails par session (PID, port, statut routable, heure de démarrage).
+Cliquer sur le badge ouvre un **popover de sessions** avec les détails par instance : PID, port, statut routable, état de traitement en cours, et heure de démarrage relative.
+
+**Blocage des actions manuelles** : quand aucune session n'est connectée (`N = 0`), les drags inter-colonnes et les boutons trigger sont désactivés. Le réordonnancement au sein d'une même colonne (tri du backlog) reste toujours autorisé.
 
 ### Configuration recommandée
 
