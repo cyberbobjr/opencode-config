@@ -189,10 +189,10 @@ cause        = "middleware checks expiration before refresh"
 2. Mark `qa.status = passed` or `failed`:
    ```
    # Success:
-   kanban-update-story("[story_id]", '{"_actor": "qa", "qa": {"status": "passed", "ac_covered": "8/8", "notes": "All ACs validated", "ac_failures": []}}')
+   kanban-update-story("[story_id]", '{"_actor": "qa", "qa": {"status": "passed", "ac_covered": "8/8", "notes": "All ACs validated", "ac_failures": []}, "agent_status": null}')
 
    # Failure:
-   kanban-update-story("[story_id]", '{"_actor": "qa", "qa": {"status": "failed", "ac_covered": "6/8", "notes": "ACs 3, 7 failed", "ac_failures": [{"ac_id": "AC 3", "title": "...", "test_failing": "...", "assertion": "...", "file": "...", "cause": "..."}]}}')
+   kanban-update-story("[story_id]", '{"_actor": "qa", "qa": {"status": "failed", "ac_covered": "6/8", "notes": "ACs 3, 7 failed", "ac_failures": [{"ac_id": "AC 3", "title": "...", "test_failing": "...", "assertion": "...", "file": "...", "cause": "..."}]}, "agent_status": null}')
    ```
     The `ac_failures` list is used by TDD in `fix-failing-acs` mode.
 

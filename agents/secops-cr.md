@@ -145,7 +145,7 @@ For dependency audit and auth middleware checks: use the commands from `agents_m
 
 Persist the results in the story via MCP:
 ```
-kanban-update-story("[story_id]", '{"_actor": "secops-cr", "secops_report": {"mode": "code-review", "status": "passed|failed|skipped", "files_audited": 5, "issues": [...], "notes": "..."}}')
+kanban-update-story("[story_id]", '{"_actor": "secops-cr", "secops_report": {"mode": "code-review", "status": "passed|failed|skipped", "files_audited": 5, "issues": [...], "notes": "..."}, "agent_status": null}')
 ```
 
 Statuses:

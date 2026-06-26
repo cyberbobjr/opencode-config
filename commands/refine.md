@@ -239,9 +239,16 @@ If any item fails: revise before advancing.
 ---
 
 **Advance to threat model:**
+
+First, signal that the autonomous work is done:
+```
+kanban-update-story("$ARGUMENTS", '{"agent_status": null}')
+```
+
 - **Called via `/next-story` orchestrator** (the calling context explicitly says "Orchestrator context") → call `kanban-move-story("$ARGUMENTS", "secops_tm", "refine")` and return the report. The orchestrator continues.
-- **Called standalone** → ask:
-  > "✅ Refinement complete — [N] ACs validated. Proceed to threat model (`secops_tm`)? [yes / no]"
+- **Called standalone** →
+  1. Call `kanban-update-story("$ARGUMENTS", '{"agent_status": "awaiting_input"}')`
+  2. Ask: "✅ Refinement complete — [N] ACs validated. Proceed to threat model (`secops_tm`)? [yes / no]"
   - **yes** → `kanban-move-story("$ARGUMENTS", "secops_tm", "refine")` → run `/secops "$ARGUMENTS" mode=threat-model`
   - **no** → `kanban-update-story("$ARGUMENTS", '{"agent_status": null}')` → stop. "To continue later: drag the card to `secops_tm` on the dashboard."
 

@@ -196,7 +196,7 @@ If the story creates or modifies a backend endpoint:
 
 2. Mark `tdd.status = passed` (or `failed`) via:
    ```
-   kanban-update-story("[story_id]", '{"_actor": "tdd", "tdd": {"status": "passed", "tests": 10, "coverage": "92%", "notes": "<your composed summary>"}}')
+   kanban-update-story("[story_id]", '{"_actor": "tdd", "tdd": {"status": "passed", "tests": 10, "coverage": "92%", "notes": "<your composed summary>"}, "agent_status": null}')
    ```
 
 2. **Advance to security code review:**

@@ -128,10 +128,17 @@ kanban-update-story("[story_id]", '{"_actor": "secops-tm", "secops_report": {"mo
 ```
 
 **Advance to implementation:**
-- If `review_required: true` → stop and display the Security Brief (user validates before continuing)
+
+After persisting, clear the processing indicator:
+```
+kanban-update-story("[story_id]", '{"agent_status": null}')
+```
+
+- If `review_required: true` → call `kanban-update-story("[story_id]", '{"agent_status": "awaiting_input"}')` then stop and display the Security Brief (user validates before continuing)
 - If `review_required: false` and called from `/next-story US X.Y` full-cycle orchestration (context says "Orchestrator context") → return the report and stop. The orchestrator handles the move to `tdd`.
-- If `review_required: false` and called standalone (dashboard trigger) → ask:
-  > "✅ Threat model — no blocking risk. Proceed to TDD implementation? [yes / no]"
+- If `review_required: false` and called standalone (dashboard trigger) →
+  1. Call `kanban-update-story("[story_id]", '{"agent_status": "awaiting_input"}')`
+  2. Ask: "✅ Threat model — no blocking risk. Proceed to TDD implementation? [yes / no]"
   - **yes** → `kanban-move-story("[story_id]", "tdd", "secops-tm")`
   - **no** → `kanban-update-story("[story_id]", '{"agent_status": null}')` → stop. "To continue later: drag the card to `tdd` on the dashboard."
 
