@@ -60,29 +60,41 @@ function handleChange(change, group) {
         </span>
       </div>
 
-      <!-- Done/Blocked column: static list with collapse -->
+      <!-- Done/Blocked column: drop-only draggable (pull:false prevents dragging out) -->
       <template v-if="group.id === 'termine'">
-        <div class="flex-1 min-h-12 rounded-b-lg bg-slate-800/40 p-2 space-y-2 border border-t-0 border-slate-800">
-          <KanbanCard
-            v-for="story in (showAllDone ? localCols.termine : localCols.termine.slice(0, DONE_PREVIEW))"
-            :key="story.id"
-            :story="story"
-            :show-status="true"
-            :no-session="noSession"
-            @click="emit('open-modal', story.id)"
-            @trigger="emit('trigger', story.id)"
-            @move="(status) => emit('move', { id: story.id, status })"
-          />
-          <button
-            v-if="localCols.termine.length > DONE_PREVIEW"
-            class="w-full text-xs text-slate-500 hover:text-slate-300 py-1.5 transition-colors"
-            @click="showAllDone = !showAllDone"
-          >
-            {{ showAllDone
-              ? '↑ Réduire'
-              : `↓ Voir les ${localCols.termine.length - DONE_PREVIEW} autres` }}
-          </button>
-        </div>
+        <draggable
+          :model-value="showAllDone ? localCols.termine : localCols.termine.slice(0, DONE_PREVIEW)"
+          :group="{ name: 'simple', pull: false, put: true }"
+          item-key="id"
+          :sort="false"
+          class="flex-1 min-h-12 rounded-b-lg bg-slate-800/40 p-2 space-y-2 border border-t-0 border-slate-800"
+          ghost-class="opacity-30"
+          chosen-class="drag-chosen"
+          :move="canMove"
+          @change="(e) => handleChange(e, group)"
+        >
+          <template #item="{ element }">
+            <KanbanCard
+              :story="element"
+              :show-status="true"
+              :no-session="noSession"
+              @click="emit('open-modal', element.id)"
+              @trigger="emit('trigger', element.id)"
+              @move="(status) => emit('move', { id: element.id, status })"
+            />
+          </template>
+          <template #footer>
+            <button
+              v-if="localCols.termine.length > DONE_PREVIEW"
+              class="w-full text-xs text-slate-500 hover:text-slate-300 py-1.5 transition-colors"
+              @click="showAllDone = !showAllDone"
+            >
+              {{ showAllDone
+                ? '↑ Réduire'
+                : `↓ Voir les ${localCols.termine.length - DONE_PREVIEW} autres` }}
+            </button>
+          </template>
+        </draggable>
       </template>
 
       <!-- All other columns: draggable -->
