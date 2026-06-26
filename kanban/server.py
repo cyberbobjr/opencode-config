@@ -662,6 +662,9 @@ def api_update(sid: str, body: dict, no_trigger: bool = False, target_port: int 
     old_status = s.get("status", "pending")
     apply_update(s, body, default_actor="dashboard")
     new_status = s.get("status", old_status)
+    # Clear the processing indicator when moving to a column with no associated command
+    if new_status != old_status and new_status not in STATUS_COMMANDS and "agent_status" not in body:
+        s["agent_status"] = None
     save_one(sid, s)
     if not no_trigger and new_status != old_status and new_status in STATUS_COMMANDS:
         cmd_name, cmd_args = STATUS_COMMANDS[new_status](sid)
