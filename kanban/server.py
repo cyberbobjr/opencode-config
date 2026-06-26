@@ -235,8 +235,7 @@ def _pick_available_session() -> int | None:
         if not _probe_processing(info["opencode_port"]):
             return info["opencode_port"]
 
-    # All busy — fall back to the first routable session
-    return routable[0]["opencode_port"]
+    return None  # all sessions busy — caller must handle
 
 
 def _resolve_target_url(target_port: int | None) -> str:
@@ -269,6 +268,14 @@ def trigger_opencode(story_id: str, command: str | None = None, target_port: int
         cmd = f"/{cmd}"
 
     base = _resolve_target_url(target_port)
+
+    # Hard gate: refuse to inject into a session that is actively processing a prompt.
+    # This catches explicit target_port selections and the auto-route fallback.
+    port_str = base.rsplit(":", 1)[-1]
+    if port_str.isdigit() and _probe_processing(int(port_str)):
+        log.warning(f"  ⚠ Session {base} is busy — trigger rejected for {story_id}")
+        return {"triggered": False, "busy": True, "error": "OpenCode session is currently processing a prompt"}
+
     _debug({"step": "trigger", "story": story_id, "command": cmd, "target": base})
     log.info(f"  → Injecting into TUI: {cmd} → {base}")
 
