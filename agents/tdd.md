@@ -31,10 +31,13 @@ At the end, return this structured report:
 ```markdown
 # TDD Report — [story_id]
 **status**: passed | failed
-**tests**: N created, N passed, N failed
-**coverage**: XX%
-**files**: list of modified/created files
-**notes**: blockers, remarks, uncovered edge cases
+**tests**: N created, N passed, N failed | **coverage**: XX%
+**test_types**: unit, integration, ui-int
+**files_created**: tests/test_auth.py, ...
+**files_modified**: app/auth.py, ...
+**acs_covered**: AC1 — description, AC2 — description
+**blockers**: (empty if none)
+**notes**: optional caveats, edge cases, remarks
 ```
 
 You must also update the story via the Kanban MCP tools throughout execution (see steps below).
@@ -196,7 +199,7 @@ If the story creates or modifies a backend endpoint:
 
 2. Mark `tdd.status = passed` (or `failed`) via:
    ```
-   kanban-update-story("[story_id]", '{"_actor": "tdd", "tdd": {"status": "passed", "tests": 10, "coverage": "92%", "notes": "<your composed summary>"}, "agent_status": null}')
+   kanban-update-story("[story_id]", '{"_actor": "tdd", "tdd": {"status": "passed", "tests_created": 10, "tests_passed": 10, "tests_failed": 0, "coverage": "92%", "test_types": ["unit", "integration"], "files_created": ["tests/test_auth.py"], "files_modified": ["app/auth.py"], "acs_covered": ["AC1 — description", "AC2 — description"], "blockers": [], "notes": "optional caveats"}, "agent_status": null}')
    ```
 
 2. **Advance to security code review:**

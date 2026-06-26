@@ -76,7 +76,11 @@ const simplifyDone = computed(() =>
   !simplifyComments.value &&
   (props.story.history || []).some(e => e.by === 'simplify')
 )
-const tddNotes         = computed(() => props.story.tdd?.notes || '')
+const tddReport        = computed(() => {
+  const t = props.story.tdd
+  if (!t || typeof t !== 'object') return null
+  return t.status ? t : null
+})
 const storyHistory     = computed(() => [...(props.story.history || [])].reverse())
 
 // ── History display ───────────────────────────────────────────────────
@@ -324,33 +328,81 @@ function confirmDelete() {
           </div>
 
           <!-- TDD (read-only) -->
-          <div class="bg-slate-800/60 rounded-lg p-4 border border-slate-700 space-y-3">
-            <div class="flex items-center justify-between">
+          <div v-if="tddReport" class="bg-slate-800/60 rounded-lg border border-slate-700 divide-y divide-slate-700/60 text-sm">
+
+            <!-- Header -->
+            <div class="flex items-center justify-between px-4 py-3">
               <span class="text-sm font-semibold text-slate-300">TDD</span>
               <span
-                v-if="story.tdd?.status"
                 class="text-xs px-2 py-0.5 rounded-full font-medium"
                 :class="{
-                  'bg-emerald-900/50 text-emerald-400 border border-emerald-800': story.tdd.status === 'done' || story.tdd.status === 'passed',
-                  'bg-blue-900/50 text-blue-400 border border-blue-800': story.tdd.status === 'in_progress',
-                  'bg-red-900/50 text-red-400 border border-red-800': story.tdd.status === 'failed',
-                  'bg-slate-700 text-slate-400 border border-slate-600': !['done','passed','in_progress','failed'].includes(story.tdd.status),
+                  'bg-emerald-900/50 text-emerald-400 border border-emerald-800': tddReport.status === 'done' || tddReport.status === 'passed',
+                  'bg-blue-900/50 text-blue-400 border border-blue-800': tddReport.status === 'in_progress',
+                  'bg-red-900/50 text-red-400 border border-red-800': tddReport.status === 'failed',
+                  'bg-slate-700 text-slate-400 border border-slate-600': !['done','passed','in_progress','failed'].includes(tddReport.status),
                 }"
-              >{{ story.tdd.status }}</span>
+              >{{ tddReport.status }}</span>
             </div>
-            <div v-if="story.tdd?.tests_count || story.tdd?.coverage" class="flex gap-6 text-sm">
-              <div v-if="story.tdd?.tests_count" class="text-slate-400">
-                Tests : <span class="text-slate-200 font-medium">{{ story.tdd.tests_count }}</span>
-              </div>
-              <div v-if="story.tdd?.coverage" class="text-slate-400">
-                Couverture : <span class="text-slate-200 font-medium">{{ story.tdd.coverage }}%</span>
+
+            <!-- Stats -->
+            <div v-if="tddReport.tests_created != null || tddReport.tests != null || tddReport.coverage" class="px-4 py-3 flex flex-wrap gap-4">
+              <template v-if="tddReport.tests_created != null">
+                <span class="text-slate-400">Créés : <span class="text-slate-200 font-medium">{{ tddReport.tests_created }}</span></span>
+                <span class="text-slate-400">Passés : <span class="text-emerald-400 font-medium">{{ tddReport.tests_passed ?? '—' }}</span></span>
+                <span class="text-slate-400">Échoués : <span class="font-medium" :class="tddReport.tests_failed > 0 ? 'text-red-400' : 'text-slate-400'">{{ tddReport.tests_failed ?? '—' }}</span></span>
+              </template>
+              <span v-else-if="tddReport.tests != null" class="text-slate-400">Tests : <span class="text-slate-200 font-medium">{{ tddReport.tests }}</span></span>
+              <span v-if="tddReport.coverage" class="text-slate-400">Coverage : <span class="text-slate-200 font-medium">{{ tddReport.coverage }}</span></span>
+            </div>
+
+            <!-- Test types -->
+            <div v-if="tddReport.test_types?.length" class="px-4 py-3">
+              <p class="text-xs text-slate-500 uppercase font-medium mb-1.5">Types de tests</p>
+              <div class="flex flex-wrap gap-1.5">
+                <span
+                  v-for="t in tddReport.test_types" :key="t"
+                  class="text-xs px-2 py-0.5 rounded-full bg-blue-900/40 text-blue-300 border border-blue-700/40"
+                >{{ t }}</span>
               </div>
             </div>
-            <div v-if="tddNotes">
-              <label class="label text-xs">TDD Summary</label>
-              <div class="bg-slate-900/60 rounded-lg p-3 border border-slate-700/50">
-                <MarkdownContent :content="tddNotes" />
-              </div>
+
+            <!-- ACs covered -->
+            <div v-if="tddReport.acs_covered?.length" class="px-4 py-3">
+              <p class="text-xs text-slate-500 uppercase font-medium mb-1.5">ACs couvertes</p>
+              <ul class="space-y-1">
+                <li v-for="(ac, i) in tddReport.acs_covered" :key="i" class="flex gap-2 text-slate-300">
+                  <span class="text-emerald-500 flex-shrink-0">✓</span>{{ ac }}
+                </li>
+              </ul>
+            </div>
+
+            <!-- Files -->
+            <div v-if="tddReport.files_created?.length || tddReport.files_modified?.length" class="px-4 py-3">
+              <p class="text-xs text-slate-500 uppercase font-medium mb-1.5">Fichiers</p>
+              <ul class="space-y-1">
+                <li v-for="f in tddReport.files_created" :key="'c-' + f" class="flex gap-2 text-slate-300">
+                  <span class="text-emerald-500 flex-shrink-0 font-mono">+</span>{{ f }}
+                </li>
+                <li v-for="f in tddReport.files_modified" :key="'m-' + f" class="flex gap-2 text-slate-300">
+                  <span class="text-blue-400 flex-shrink-0 font-mono">~</span>{{ f }}
+                </li>
+              </ul>
+            </div>
+
+            <!-- Blockers -->
+            <div v-if="tddReport.blockers?.length" class="px-4 py-3">
+              <p class="text-xs text-slate-500 uppercase font-medium mb-1.5">Blockers</p>
+              <ul class="space-y-1">
+                <li v-for="(b, i) in tddReport.blockers" :key="i" class="flex gap-2 text-slate-300">
+                  <span class="text-red-500 flex-shrink-0">✗</span>{{ b }}
+                </li>
+              </ul>
+            </div>
+
+            <!-- Notes -->
+            <div v-if="tddReport.notes" class="px-4 py-3">
+              <p class="text-xs text-slate-500 uppercase font-medium mb-1.5">Notes</p>
+              <MarkdownContent :content="tddReport.notes" />
             </div>
           </div>
 
@@ -454,7 +506,7 @@ function confirmDelete() {
           </div>
 
           <p
-            v-if="!story.notes && !story.tdd?.status && !story.qa?.status && !secopsReport && !simplifyComments"
+            v-if="!story.notes && !tddReport && !story.qa?.status && !secopsReport && !simplifyComments"
             class="text-slate-600 text-sm italic"
           >
             No progress data yet.
