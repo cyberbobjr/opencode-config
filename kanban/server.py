@@ -729,6 +729,9 @@ def api_move_story(sid: str, body: dict, no_trigger: bool = False, target_port: 
             "by": actor,
             "changes": [f"status: {old_status} → {new_status}"],
         })
+        # Clear the processing indicator when moving to a column with no associated command
+        if new_status not in STATUS_COMMANDS:
+            s["agent_status"] = None
     save_one(sid, s)
     if not no_trigger and new_status != old_status and new_status in STATUS_COMMANDS:
         cmd_name, cmd_args = STATUS_COMMANDS[new_status](sid)
@@ -956,6 +959,9 @@ def update_story(story_id: str, changes: str) -> str:
         return json.dumps({"error": f"Invalid JSON in changes: {e}"})
 
     actor = updates.get("_actor", "agent")
+    # Workflow status changes must go through kanban-move-story, not kanban-update-story
+    if "status" in updates:
+        del updates["status"]
     fields = [k for k in updates if k != "_actor"]
     _mcp_debug("update_story", "in", story_id=story_id, actor=actor, fields=fields)
 
@@ -1005,6 +1011,9 @@ def move_story(story_id: str, new_status: str, actor: str = "agent") -> str:
             "by": actor,
             "changes": [f"status: {old_status} → {new_status}"],
         })
+        # Clear the processing indicator — the next trigger will re-set it if needed
+        if new_status not in STATUS_COMMANDS:
+            s["agent_status"] = None
     save_one(story_id, s)
     _mcp_debug("move_story", "out",
         old_status=old_status,
