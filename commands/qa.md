@@ -48,7 +48,8 @@ Display the QA report returned by the subagent.
 
 - If `status: failed` in the report → stop, display the detailed failure report (user decides: fix / block / force)
 - If `status: passed` and called from `/next-story US X.Y` orchestrator (context says "Orchestrator context") → return the report only. The orchestrator handles `kanban-move-story` to `simplify`.
-- If `status: passed` and called standalone (dashboard trigger) → ask:
-  > "✅ QA passed — [N/N] ACs covered. Proceed to quality gates (`simplify`)? [yes / no]"
+- If `status: passed` and called standalone (dashboard trigger) →
+  1. Call `kanban-update-story("$ARGUMENTS", '{"agent_status": "awaiting_input"}')`
+  2. Ask: "✅ QA passed — [N/N] ACs covered. Proceed to quality gates (`simplify`)? [yes / no]"
   - **yes** → `kanban-move-story("$ARGUMENTS", "simplify", "qa")` → run `/simplify $ARGUMENTS`
-  - **no** → stop. "To continue later: drag the card to `simplify` on the dashboard."
+  - **no** → `kanban-update-story("$ARGUMENTS", '{"agent_status": null}')` → stop. "To continue later: drag the card to `simplify` on the dashboard."

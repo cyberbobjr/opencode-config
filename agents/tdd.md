@@ -61,7 +61,7 @@ You must also update the story via the Kanban MCP tools throughout execution (se
 
 1. Mark `tdd.status = in_progress` via:
    ```
-   kanban-update-story("[story_id]", '{"_actor": "tdd", "tdd": {"status": "in_progress"}}')
+   kanban-update-story("[story_id]", '{"_actor": "tdd", "tdd": {"status": "in_progress"}, "agent_status": "processing"}')
    ```
 2. Read the full story from the injected `story_json` — retrieve ACs, `implementation_guide`, description
 3. Read the `agents_md` section from the injected context for project conventions

@@ -32,6 +32,11 @@ Before any question:
 
 ## Step 2 — Question Cycle (MANDATORY)
 
+Before the first question, signal that user interaction is needed:
+```
+kanban-update-story("$ARGUMENTS", '{"agent_status": "awaiting_input"}')
+```
+
 Ask **4 to 6 questions** (up to 8 for complex stories). Each question uses the OpenCode `question` tool.
 
 | Question | Lead role | Challenge objective | Ideation mission |
@@ -79,7 +84,7 @@ Identify the **story type** then write the adapted plan. Write **only the releva
 | `backend` | API endpoints, services, background workers, ORM models |
 | `frontend` | UI components, state stores, pages, CSS/styling |
 | `database` | Migrations, schemas, indexes, SQL queries |
-| `devops` | Dockerfile, docker-compose, CI/CD scripts, Makefile |
+| `devops` | Dockerfile, docker-compose, CI/CD scripts, Makefile, Celery queue wiring |
 | `infrastructure` | Env vars, nginx/caddy configs, third-party services, secrets |
 | `architecture` | Inter-module refactoring, cross-cutting patterns, restructuring |
 | `bugfix` | Correction of existing behavior — limited and precise scope |
@@ -155,6 +160,10 @@ Identify the **story type** then write the adapted plan. Write **only the releva
   - Apply migration: use the command from `AGENTS.md` / `.opencode/rules/commands.md`
   - Verify migration applied: use the DB introspection command for this stack (see `AGENTS.md`)
   - Verify rollback: run downgrade then upgrade (or equivalent per stack)
+- If the story introduces new Celery background workers, steps MUST include:
+  - Declare all queues used by new tasks (via `queue=` in `@celery_app.task`)
+  - Verify `celery_cli.py` and `docker-compose.yml` worker startup commands consume every declared queue via the `-Q` flag
+  - If a new queue is introduced, verify no other task module was already using it to avoid unintended cross-consumption
 - Constraints: imposed patterns, what NOT to do, performance thresholds
 
 ---
@@ -223,6 +232,7 @@ kanban-update-story("$ARGUMENTS", '{
 - [ ] `critical_cases` lists at least the edge cases identified during the dialogue
 - [ ] Every AC is a testable assertion — no "user can..." phrasing
 - [ ] `approach` is specific enough that two developers would implement it the same way
+- [ ] If new Celery queues are declared → `celery_cli.py` and `docker-compose.yml` worker commands include them in `-Q`
 
 If any item fails: revise before advancing.
 
@@ -233,7 +243,7 @@ If any item fails: revise before advancing.
 - **Called standalone** → ask:
   > "✅ Refinement complete — [N] ACs validated. Proceed to threat model (`secops_tm`)? [yes / no]"
   - **yes** → `kanban-move-story("$ARGUMENTS", "secops_tm", "refine")` → run `/secops "$ARGUMENTS" mode=threat-model`
-  - **no** → stop. "To continue later: drag the card to `secops_tm` on the dashboard."
+  - **no** → `kanban-update-story("$ARGUMENTS", '{"agent_status": null}')` → stop. "To continue later: drag the card to `secops_tm` on the dashboard."
 
 ---
 
@@ -261,6 +271,11 @@ When wearing the DevSecOps hat, draw from these questions based on the story:
 - What verification confirms the migration was applied successfully?
 - Is there a rollback strategy if the migration fails?
 - Does the test suite validate the migration against a pre-existing DB (not just `create_all` on a fresh DB)?
+
+**Celery / Background Workers (⚠️ MANDATORY for any story that creates or modifies background workers):**
+- Is every `queue=` declared in a `@celery_app.task` decorator consumed by the worker startup command (`-Q` flag in `celery_cli.py`, `docker-compose.yml`)?
+- If adding a new queue name, would changing the existing `-Q` list break another queue's tasks?
+- Does an integration test exercise the task through the actual Redis queue (not just `task_always_eager=True`) to catch queue mismatch?
 
 **Admin:**
 - Do destructive actions require confirmation / soft-delete?

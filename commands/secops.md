@@ -2,7 +2,7 @@
 description: DevSecOps Agent — security review in two modes (threat-model + code-review)
 argument:
   required: true
-  description: "Story ID (e.g. 'US 1.3')"
+  description: "Story ID followed by mode (e.g. 'US 1.3 mode=threat-model' or 'US 1.3 mode=code-review')"
 options:
   mode:
     description: "Review mode: threat-model (during refinement) or code-review (after TDD)"
@@ -12,7 +12,16 @@ options:
 # SecOps Agent — `/secops $ARGUMENTS`
 
 **Received arguments:** `$ARGUMENTS`
-(story ID = first value in quotes or before `mode=` ; mode = value after `mode=`, default `code-review`)
+
+Parse as follows:
+- **story_id**: everything before ` mode=` (trimmed, preserving spaces in the ID). Example: `US 7.30`
+- **mode**: value after `mode=`, default `code-review` if absent
+
+| Input | story_id | mode |
+|-------|----------|------|
+| `US 7.30 mode=threat-model` | `US 7.30` | `threat-model` |
+| `US 1.3 mode=code-review` | `US 1.3` | `code-review` |
+| `US 1.3` | `US 1.3` | `code-review` (default) |
 
 Security review at two points in the cycle:
 
@@ -30,8 +39,8 @@ anticipate security risks before they are coded.
 
 ### 1. Initialization
 
-1. Read the ACs via `kanban-get-story("US X.Y")` from `user-stories/*.json`
-2. Read the refinement report (`/refine`) for context
+1. Call `kanban-get-story("[story_id]")` to retrieve the full story
+2. From the retrieved story, read `refine_decisions`, `description`, and `acceptance_criteria` for refinement context
 3. Identify sensitive surfaces
 
 ### 2. Sensitive surface detection
@@ -51,6 +60,11 @@ Determine whether the story touches one or more of these domains:
 | LLM pipeline | raw texts, prompt templates, AI-generated content |
 
 ### 3. Threat modeling questions
+
+If any sensitive surface was detected in Step 2, signal that user interaction is needed before the first question:
+```
+kanban-update-story("[story_id]", '{"agent_status": "awaiting_input"}')
+```
 
 For each identified surface, use the `question` tool to validate critical points.
 **Only ask questions relevant to the detected surfaces** — ask nothing if no sensitive surface is found.
@@ -115,11 +129,11 @@ kanban-update-story("[story_id]", '{"_actor": "secops-tm", "secops_report": {"mo
 
 **Advance to implementation:**
 - If `review_required: true` → stop and display the Security Brief (user validates before continuing)
-- If `review_required: false` and **called via `/next-story` orchestrator** (the calling context explicitly says "Orchestrator context") → return the report and stop. The orchestrator handles the move to `tdd`.
-- If `review_required: false` and **called standalone** → ask:
+- If `review_required: false` and called from `/next-story US X.Y` full-cycle orchestration (context says "Orchestrator context") → return the report and stop. The orchestrator handles the move to `tdd`.
+- If `review_required: false` and called standalone (dashboard trigger) → ask:
   > "✅ Threat model — no blocking risk. Proceed to TDD implementation? [yes / no]"
   - **yes** → `kanban-move-story("[story_id]", "tdd", "secops-tm")`
-  - **no** → stop. "To continue later: drag the card to `tdd` on the dashboard."
+  - **no** → `kanban-update-story("[story_id]", '{"agent_status": null}')` → stop. "To continue later: drag the card to `tdd` on the dashboard."
 
 ---
 
@@ -136,6 +150,8 @@ Thin wrapper that assembles context and delegates the audit to the isolated `sec
    - `.opencode/rules/conventions.md` — backend/frontend paths and conventions
    - `.opencode/rules/commands.md` — dependency audit command if applicable
 
+> **Note:** If `git diff HEAD` is empty, the subagent will return `status: skipped` automatically — no manual check needed.
+
 ### Phase 2: Launch SecOps-CR Subagent
 
 Use the **Task tool** to launch the `secops-cr` subagent with `subagent_type: "secops-cr"`.
@@ -145,6 +161,8 @@ Inject the following as the Task prompt (replace placeholders with actual values
 ```
 story_id: [story_id]
 is_orchestrated: false
+# is_orchestrated: true only when called from /next-story US X.Y full-cycle orchestration.
+# Dashboard-triggered runs and all standalone uses → is_orchestrated: false.
 
 STORY JSON:
 [paste the full JSON returned by kanban-get-story]
@@ -161,8 +179,6 @@ Instructions:
 - At the end, return the structured SecOps CR report
 ```
 
-> **Note:** If this command is called from `/next-story` with the explicit annotation "Orchestrator context", set `is_orchestrated: true` in the prompt so the subagent does not ask about advancing.
-
 ### Phase 3: Display Result
 
 Display the SecOps CR report returned by the subagent.
@@ -170,11 +186,12 @@ Display the SecOps CR report returned by the subagent.
 ### Phase 4: Advance
 
 - If `status: failed` → stop and display the issues (user fixes before continuing)
-- If `passed` or `skipped` and **called via `/next-story` orchestrator** (the calling context explicitly says "Orchestrator context") → return the report. The orchestrator handles the move to `qa`.
-- If `passed` or `skipped` and **called standalone** → ask:
-  > "✅ SecOps code review — [passed/skipped]. Proceed to QA validation? [yes / no]"
+- If `passed` or `skipped` and called from `/next-story US X.Y` full-cycle orchestration (context says "Orchestrator context") → return the report. The orchestrator handles the move to `qa`.
+- If `passed` or `skipped` and called standalone (dashboard trigger) →
+  1. Call `kanban-update-story("[story_id]", '{"agent_status": "awaiting_input"}')`
+  2. Ask: "✅ SecOps code review — [passed/skipped]. Proceed to QA validation? [yes / no]"
   - **yes** → `kanban-move-story("[story_id]", "qa", "secops-cr")` → run `/qa [story_id]`
-  - **no** → stop. "To continue later: drag the card to `qa` on the dashboard."
+  - **no** → `kanban-update-story("[story_id]", '{"agent_status": null}')` → stop. "To continue later: drag the card to `qa` on the dashboard."
 
 ## Reminders
 

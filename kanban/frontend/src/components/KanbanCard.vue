@@ -23,6 +23,20 @@ const nextCol  = computed(() => colIndex.value < KANBAN_COLUMNS.length - 1 ? KAN
     <div class="flex items-center justify-between mb-1.5 gap-1">
       <span class="text-xs text-slate-500 font-mono">{{ story.id }}</span>
       <div class="flex items-center gap-1.5">
+        <!-- Agent status: always visible when OpenCode is active on this story -->
+        <template v-if="story.agent_status">
+          <span
+            v-if="story.agent_status === 'awaiting_input'"
+            class="flex items-center gap-0.5 text-xs text-blue-400 px-1.5 py-0.5 rounded bg-blue-950 border border-blue-700 animate-pulse font-medium"
+            title="OpenCode is waiting for your input"
+          >⚡ Action</span>
+          <svg
+            v-else
+            class="w-3.5 h-3.5 text-amber-400 animate-spin flex-shrink-0"
+            :title="`OpenCode: ${story.agent_status}`"
+            viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"
+          ><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
+        </template>
         <span
           v-if="showStatus"
           class="text-xs px-1.5 py-0.5 rounded font-medium"

@@ -272,6 +272,13 @@ def trigger_opencode(story_id: str, command: str | None = None, target_port: int
     _debug({"step": "trigger", "story": story_id, "command": cmd, "target": base})
     log.info(f"  → Injecting into TUI: {cmd} → {base}")
 
+    # Mark story as triggered so the dashboard shows a processing indicator immediately
+    s = load_one(story_id)
+    if s:
+        s["agent_status"] = "triggered"
+        save_one(story_id, s)
+        bump_version()
+
     threading.Thread(target=_tui_type_and_submit, args=(cmd, base), daemon=True).start()
 
     return {"triggered": True, "story_id": story_id, "command": cmd, "target": base}

@@ -59,7 +59,8 @@ Display the TDD report returned by the subagent.
   2. Fix the tests if ACs were updated → re-run `/tdd $ARGUMENTS`
   3. Block the story → drag to `blocked` on the dashboard
 - If `status: passed` and called from `/next-story US X.Y` orchestrator (context says "Orchestrator context") → return the report only. The orchestrator handles `kanban-move-story` to `secops_cr`.
-- If `status: passed` and called standalone (dashboard trigger) → ask:
-  > "✅ TDD passed — [N] tests, [coverage]. Proceed to security code review (`secops_cr`)? [yes / no]"
+- If `status: passed` and called standalone (dashboard trigger) →
+  1. Call `kanban-update-story("$ARGUMENTS", '{"agent_status": "awaiting_input"}')`
+  2. Ask: "✅ TDD passed — [N] tests, [coverage]. Proceed to security code review (`secops_cr`)? [yes / no]"
   - **yes** → `kanban-move-story("$ARGUMENTS", "secops_cr", "tdd")` → run `/secops "$ARGUMENTS" mode=code-review`
-  - **no** → stop. "To continue later: drag the card to `secops_cr` on the dashboard."
+  - **no** → `kanban-update-story("$ARGUMENTS", '{"agent_status": null}')` → stop. "To continue later: drag the card to `secops_cr` on the dashboard."

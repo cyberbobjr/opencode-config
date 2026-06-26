@@ -57,7 +57,7 @@ Return this structured report at the end:
 
 1. Mark `qa.status = in_progress` via:
    ```
-   kanban-update-story("[story_id]", '{"_actor": "qa", "qa": {"status": "in_progress"}}')
+   kanban-update-story("[story_id]", '{"_actor": "qa", "qa": {"status": "in_progress"}, "agent_status": "processing"}')
    ```
 2. Read the ACs from `story_json.acceptance_criteria`
 3. Re-read the implementation files (created/modified during the TDD step — listed in story_json.tdd if available)
