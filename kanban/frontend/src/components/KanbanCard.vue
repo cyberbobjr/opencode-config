@@ -23,8 +23,8 @@ const nextCol  = computed(() => colIndex.value < KANBAN_COLUMNS.length - 1 ? KAN
     <div class="flex items-center justify-between mb-1.5 gap-1">
       <span class="text-xs text-slate-500 font-mono">{{ story.id }}</span>
       <div class="flex items-center gap-1.5">
-        <!-- Agent status: always visible when OpenCode is active on this story -->
-        <template v-if="story.agent_status">
+        <!-- Agent status: only show for active (non-terminal) stories -->
+        <template v-if="story.agent_status && story.status !== 'completed' && story.status !== 'blocked'">
           <span
             v-if="story.agent_status === 'awaiting_input'"
             class="flex items-center gap-0.5 text-xs text-blue-400 px-1.5 py-0.5 rounded bg-blue-950 border border-blue-700 animate-pulse font-medium"

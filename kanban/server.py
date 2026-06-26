@@ -275,9 +275,10 @@ def trigger_opencode(story_id: str, command: str | None = None, target_port: int
     # Mark story as triggered so the dashboard shows a processing indicator immediately
     s = load_one(story_id)
     if s:
-        s["agent_status"] = "triggered"
-        save_one(story_id, s)
-        bump_version()
+        if s.get("status") not in ("completed", "blocked"):
+            s["agent_status"] = "triggered"
+            save_one(story_id, s)
+            bump_version()
 
     threading.Thread(target=_tui_type_and_submit, args=(cmd, base), daemon=True).start()
 
