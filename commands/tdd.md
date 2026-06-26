@@ -1,5 +1,5 @@
 ---
-description: TDD Command — fetches story context and launches the tdd subagent via Task tool
+description: TDD Command — fetches story context, determines mode, and launches the tdd subagent via Task tool
 argument:
   required: true
   description: "Story ID (e.g. 'US 1.3')"
@@ -7,17 +7,24 @@ argument:
 
 # TDD Command — `/tdd $ARGUMENTS`
 
-Thin orchestrator wrapper that assembles context and delegates implementation to the isolated `tdd` subagent.
+Thin orchestrator wrapper that assembles context, determines the correct mode, and delegates implementation to the isolated `tdd` subagent.
 
 ## Phase 1: Gather Context
 
-1. Call `kanban-get-story("$ARGUMENTS")` to retrieve the full story (ACs, implementation_guide, description, stack)
+1. Call `kanban-get-story("$ARGUMENTS")` to retrieve the full story (ACs, implementation_guide, qa, description, stack)
 2. Read the following files and extract the relevant sections:
    - `AGENTS.md` — stack info (Identité table)
    - `.opencode/rules/commands.md` — test run commands, quality gate commands
-   - `.opencode/rules/conventions.md` — design system reference (points to `docs/design-system.md`)
+   - `.opencode/rules/conventions.md` — design system reference (if `implementation_guide.scope` contains `frontend`)
 
-## Phase 2: Launch TDD Subagent
+## Phase 2: Determine Mode
+
+Inspect the story's `qa` field:
+
+- If `story.qa.status == "failed"` and `story.qa.failures` is present → **`mode: fix-failing-acs`**, inject `ac_failing` from `story.qa.failures`
+- Otherwise → **`mode: full-cycle`**
+
+## Phase 3: Launch TDD Subagent
 
 Use the **Task tool** to launch the `tdd` subagent with `subagent_type: "tdd"`.
 
@@ -25,32 +32,34 @@ Inject the following as the Task prompt (replace placeholders with actual values
 
 ```
 story_id: $ARGUMENTS
-mode: full-cycle
+mode: [full-cycle | fix-failing-acs — determined in Phase 2]
 is_orchestrated: false
+# is_orchestrated: true only when called from /next-story US X.Y full-cycle orchestration.
+# Dashboard-triggered runs and all standalone uses → is_orchestrated: false.
 
 STORY JSON:
 [paste the full JSON returned by kanban-get-story]
 
 PROJECT CONVENTIONS:
-[paste: stack info from AGENTS.md + test/quality gate commands from .opencode/rules/commands.md + design system ref from .opencode/rules/conventions.md if frontend]
+[paste: stack info from AGENTS.md + test/quality gate commands from .opencode/rules/commands.md + design system ref from .opencode/rules/conventions.md if implementation_guide.scope contains "frontend"]
 
-Instructions:
-- Run the full Red-Green-Refactor cycle for this story
-- Update the story status via MCP tools (kanban-update-story) as you progress
-- At the end, return the structured TDD report
+[only in fix-failing-acs mode — omit entirely otherwise:]
+FAILING ACS:
+[paste story.qa.failures — list of failed ACs with diagnosis]
 ```
 
-> **Note:** If this command is called from `/next-story` with the explicit annotation "Orchestrator context", set `is_orchestrated: true` in the prompt so the subagent does not ask about advancing.
-
-## Phase 3: Display Result
+## Phase 4: Display Result
 
 Display the TDD report returned by the subagent.
 
-## Phase 4: Advance
+## Phase 5: Advance
 
-- If `status: failed` in the report → stop, display the failure details
-- If `status: passed` and this was called via `/next-story` orchestrator (context says "Orchestrator context") → return the report only. The orchestrator handles `kanban-move-story` to `secops_cr`.
-- If `status: passed` and called standalone → ask:
+- If `status: failed` → stop, display the failure details with 3 options:
+  1. Fix the implementation → re-run `/tdd $ARGUMENTS` after fixing
+  2. Fix the tests if ACs were updated → re-run `/tdd $ARGUMENTS`
+  3. Block the story → drag to `blocked` on the dashboard
+- If `status: passed` and called from `/next-story US X.Y` orchestrator (context says "Orchestrator context") → return the report only. The orchestrator handles `kanban-move-story` to `secops_cr`.
+- If `status: passed` and called standalone (dashboard trigger) → ask:
   > "✅ TDD passed — [N] tests, [coverage]. Proceed to security code review (`secops_cr`)? [yes / no]"
   - **yes** → `kanban-move-story("$ARGUMENTS", "secops_cr", "tdd")` → run `/secops "$ARGUMENTS" mode=code-review`
-  - **no** → stop. "To continue later: drag to `secops_cr` or run `/next-story secops-cr $ARGUMENTS`"
+  - **no** → stop. "To continue later: drag the card to `secops_cr` on the dashboard."

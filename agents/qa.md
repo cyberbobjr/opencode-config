@@ -18,7 +18,7 @@ Parse these fields from the injected context:
 | Field | Description |
 |-------|-------------|
 | `story_id` | e.g. "US 1.3" |
-| `is_orchestrated` | `true` if launched from `/next-story` (do NOT ask about advancing); `false` if standalone |
+| `is_orchestrated` | `true` if called from `/next-story US X.Y` full-cycle orchestration; `false` for dashboard-triggered runs and all standalone uses |
 | `story_json` | Full story object (ACs, implementation_guide, description, tdd report) |
 | `agents_md` | Project conventions: stack (AGENTS.md) + test/E2E/quality gate commands (.opencode/rules/commands.md) |
 
@@ -74,7 +74,7 @@ For each acceptance criterion, determine the required test type:
 | Business behavior | Integration | stack test tool + test DB |
 | Frontend display rule | Component | frontend test tool (see agents_md) |
 | Complete user journey | UI integration | UI-INT test tool (see agents_md) |
-| AC text contains `[UI-INT]`, `"UI-INT test:"`, or `"UI-INT:"` | UI integration | UI-INT test tool (see agents_md) |
+| AC text contains `[UI-INT]` | UI integration | UI-INT test tool (see agents_md) |
 | Background worker / queue | Integration | stack test tool + broker mock |
 
 For each AC, write a test that:
@@ -84,7 +84,7 @@ For each AC, write a test that:
 
 ### 2bis. Verify UI-INT test files exist on disk (⚠️ MANDATORY)
 
-**For every AC** whose text contains `[UI-INT]`, `"UI-INT test:"`, or `"UI-INT:"`:
+**For every AC** whose text contains `[UI-INT]`:
 
 1. Use `glob("frontend/src/**/*.ui-int.ts")` to discover existing Playwright test files
 2. If no `*.ui-int.ts` files exist at all → this AC **must fail** — the test file was never created
@@ -101,7 +101,33 @@ For each AC, write a test that:
 
 > **Note:** Do NOT create the UI-INT test yourself — QA only validates. If absent, fail the AC so the story returns to TDD for corrective mode.
 
+### 2ter. Verify database migration applied on dev DB (⚠️ MANDATORY)
+
+**For every story** whose `stack` includes `"database"` or whose `implementation_guide` contains a `migration` key:
+
+1. Run `cd backend && source .venv/bin/activate && alembic current` to check the current migration head
+2. Run `alembic check` to detect any pending (unapplied) migrations — do NOT run `alembic upgrade head`
+3. If pending migrations exist → **fail QA immediately** and include in the failure report:
+   ```
+   ac_id: "ALL"
+   title: "Database migration not applied"
+   test_failing: "alembic check detected pending migrations"
+   assertion: "All migrations should have been applied to the dev DB during TDD"
+   file: "backend/alembic/versions/"
+   cause: "Migration was never applied — story must return to TDD"
+   ```
+4. If no pending migrations: verify expected columns exist using the DB introspection command defined in `AGENTS.md` for this stack. If columns are missing → fail QA with the same structure above.
+
 ### 3. Write and run tests
+
+**Runtime smoke test — ⚠️ MANDATORY for backend stories:**
+Before writing and running tests, verify the application starts and endpoints respond without 5xx:
+1. Pick a free port: `PORT=$(python3 -c "import socket; s=socket.socket(); s.bind(('',0)); print(s.getsockname()[1]); s.close()")`
+2. Start app in background: `cd backend && .venv/bin/uvicorn app.main:app --port $PORT &`
+3. Wait for startup: `until curl -s "http://localhost:$PORT/health" >/dev/null 2>&1; do sleep 1; done`
+4. For each new/modified endpoint in the story, make a minimal curl request and assert the response is not 5xx
+5. Kill server: `kill %1 ; wait %1 2>/dev/null`
+5. If any endpoint returns 5xx → fail QA immediately with the error details
 
 Use commands from `agents_md` for the project-specific test run commands per stack.
 
@@ -156,7 +182,7 @@ cause        = "middleware checks expiration before refresh"
      {"id": 1, "text": "...", "checked": true},
      {"id": 2, "text": "...", "checked": true},
      {"id": 3, "text": "...", "checked": false},
-     {"id": 12, "text": "UI-INT test: ...", "checked": false}
+     {"id": 12, "text": "... [UI-INT]", "checked": false}
    ]}')
    ```
 
@@ -170,7 +196,7 @@ cause        = "middleware checks expiration before refresh"
    ```
     The `ac_failures` list is used by TDD in `fix-failing-acs` mode.
 
-3. **Verify ACs were persisted (⚠️ MANDATORY)** — Call `kanban-get-story("[story_id]")` and confirm the `acceptance_criteria` array has `checked: true` for every passing AC. If they are still `false`, re-attempt step 1 before proceeding.
+3. **Verify ACs were persisted (⚠️ MANDATORY)** — Call `kanban-get-story("[story_id]")` and confirm the `acceptance_criteria` array has `checked: true` for every passing AC. If they are still `false`, re-attempt step 1 once. If still not persisted after 1 retry, note it in the report and continue — do not block.
 
 4. **Advance:**
    - If `failed` → return the failure report. The caller handles the stop.

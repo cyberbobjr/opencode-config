@@ -2,128 +2,91 @@
 
 **Story ID:** `$ARGUMENTS`
 
-Refines story `$ARGUMENTS` by challenging its acceptance criteria from 4 angles AND proposing additional ideas through a mandatory question/answer cycle.
+Refines story `$ARGUMENTS` by challenging its acceptance criteria from 4 angles and proposing additions through a mandatory question/answer cycle.
 
 > ⚠️ **This command ≠ field update.**
-> `/refine` launches a full dialogue cycle (8–12 questions, technical plan, persistence). It must only be invoked on explicit user request or from the workflow coordinator (`/next-story`).
-> To fix AC text, add a note, or update the description without restarting the refinement process: use `kanban-update-story` directly, without calling `/refine` or changing the story status.
+> `/refine` launches a full dialogue cycle (4–6 questions, technical plan, persistence). It must only be invoked on explicit user request or from the workflow coordinator (`/next-story`).
+> To fix AC text, add a note, or update the description without restarting the refinement: use `kanban-update-story` directly, without calling `/refine` or changing the story status.
 
 ## Core Principles
 
-- **Refinement is a mandatory dialogue** — you do NOT produce a report alone. You challenge the requirement, propose improvement paths, and go further into the expressed needs.
-- **You are also an explorer, not just a challenger** — before challenging, you identify what the story does NOT say and propose ideas that increase value.
-- **MANDATORY use of the `question` tool** from OpenCode for each question. No free text, no lists in a message.
-- **One question at a time** — each question uses the `question` tool, wait for the answer before the next.
+- **Refinement is a mandatory dialogue** — do NOT produce a report alone. Challenge the requirement, propose improvement paths, go further into expressed needs.
+- **One question at a time** — each question uses the OpenCode `question` tool; wait for the answer before the next.
+- **3 closed options max per question** (concrete choices, not empty "yes/no") — `custom: true` is available automatically via the tool.
+- **Every question must have a concrete impact** on the implementation — no rhetorical questions, no questions whose answer changes nothing.
+- **At least 1 question in 2 must propose a new idea** — not just challenge existing ACs, but suggest an addition the story has not anticipated.
+- **If an AC remains ambiguous after the dialogue**, rewrite it until it is an unambiguous, testable assertion before advancing. "User can..." is not a testable assertion.
 
-## Steps
+---
 
-### 0. Story retrieval
+## Step 1 — Story Retrieval
 
 Before any question:
-- Call the MCP tool `kanban-get-story "US X.Y"` to retrieve the full story (description, existing ACs, priority, phase)
-- Explore the existing code to understand the current state
-- Identify dependencies, architecture points, and gaps
-- Call `kanban-list-stories` with the same `phase` to read adjacent stories and detect opportunities
+1. Call `kanban-get-story("$ARGUMENTS")` — retrieve description, ACs, priority, phase, stack
+2. Explore existing code to understand the current state (relevant modules, existing patterns)
+3. Identify dependencies, architecture points, and gaps
+4. Call `kanban-list-stories` with the same `phase` — read adjacent stories to detect cross-pollination opportunities
+5. Check available backend routes — use the API spec command defined in `AGENTS.md` or `.opencode/rules/commands.md`. If a required route is missing or unexposed, include its creation as part of this story rather than adding a conflicting endpoint later.
 
-### 2. Exploration & Ideation (MANDATORY)
+---
 
-Before challenging existing ACs, generate **3 to 5 additional ideas** the story could cover that the ACs have not anticipated. These ideas come from 4 systematic sources:
+## Step 2 — Question Cycle (MANDATORY)
 
-| Source | Question to ask yourself |
-|--------|--------------------------|
-| **Adjacent stories** | What neighboring features could cross-pollinate this one? Is there a recurring pattern between adjacent stories that is missing here? |
-| **Blind spots** | What does the story assume without stating? What happens in undocumented edge cases? |
-| **User expectations** | If I were the end user, what related feature would I be surprised not to find here? |
-| **Technical opportunities** | Is there a technical quick win that would multiply the value of this story without major effort? |
+Ask **4 to 6 questions** (up to 8 for complex stories). Each question uses the OpenCode `question` tool.
 
-**Format:** Present these ideas as a structured block at the start of the dialogue:
+| Question | Lead role | Challenge objective | Ideation mission |
+|----------|-----------|---------------------|-----------------|
+| 1 | **Product Owner** | Business value, hidden needs | What adjacent feature could multiply value for the user? |
+| 2 | **Architect** | Technical consistency, patterns | What emerging pattern would improve overall consistency? |
+| 3 | **Developer** | Edge cases, implementation clarity, tests | What edge case could become a reusable utility? |
+| 4 | **DevSecOps** | Attack surfaces, countermeasures | What uncovered threat deserves a dedicated protection feature? |
+| 5 | **Product Owner** | Functional gaps, unexpressed needs | What need from adjacent stories should be addressed here? |
+| 6 | **Architect** | Dependencies, integration, scalability | What cross-cutting optimization (cache, batch, streaming) could be anticipated? |
+| 7+ | (cycle continues if needed, max 8) | | |
 
-```
-## Additional ideas identified
+---
 
-Before challenging the existing ACs, here are areas the story does not yet cover:
-
-1. **[Idea 1 title]** — [short description, why it adds value]
-2. **[Idea 2 title]** — [short description, why it adds value]
-3. **[Idea 3 title]** — [short description, why it adds value]
-4. **[Idea 4 title]** — [short description, why it adds value]
-
-I will now challenge the existing ACs and incorporate some of these ideas into the questions.
-```
-
-You do not need to validate this list immediately — it serves as raw material to enrich the 4-role questions. Each role will carry its own ideas into its dedicated questions.
-
-### 3. Question cycle (MANDATORY)
-
-Ask **8 to 12 questions** alternating the 4 roles. Each question uses the OpenCode `question` tool.
-
-Rules for each question:
-- **3 closed options max** (concrete choices, not empty "yes/no")
-- **1 "Other" field available** automatically via `custom: true` in the `question` tool
-- **Each question must challenge the requirement**, propose additional improvement paths, or go further than the initial statement
-- **At least 1 question in 2 must include a new idea** (not just challenging ACs — propose a concrete addition)
-- **No rhetorical questions** — every question must have a concrete impact on the implementation
-
-Role alternation:
-
-| Question | Lead role | Main objective | Ideation mission |
-|----------|-----------|----------------|-----------------|
-| 1 | **Product Owner** | Challenge business value, detect hidden needs | What adjacent feature could multiply the value delivered to the user? |
-| 2 | **Architect** | Challenge technical consistency, propose patterns | What emerging pattern (or adjacent to another story) would improve overall consistency? |
-| 3 | **Developer** | Clarify implementation, edge cases, tests | What edge case could become a reusable utility feature? |
-| 4 | **DevSecOps** | Identify attack surfaces, propose countermeasures | What uncovered threat would deserve a dedicated protection feature? |
-| 5 | **Product Owner** | Dig into functional gaps, alternatives | What unexpressed need (gathered from adjacent stories) should be addressed here? |
-| 6 | **Architect** | Validate dependencies, integration, scalability | What cross-cutting optimization (cache, batch, streaming) could be anticipated in this story? |
-| 7 | **Developer** | Challenge thresholds, performance, maintainability | What tooling or helper would be worth sharing with another story? |
-| 8 | **DevSecOps** | Check secrets, timeouts, rate limiting | What audit / monitoring omitted from the ACs could prevent a future incident? |
-| 9+ | (cycle continues if needed) | | |
-
-### 4. Synthesis
+## Step 3 — Synthesis
 
 Once all questions are answered:
-1. **Summarize the decisions made** — each question → decision → impact on the ACs
-2. **Produce the revised ACs** — integrate all decisions into an updated version of the ACs
-3. **List the complementary suggestions proposed and their outcome**:
+
+1. **Summarize decisions** — each question → decision → impact on the ACs
+2. **Produce revised ACs** — integrate all decisions; every AC must be a testable assertion (Given/When/Then or equivalent — no vague "user can..." phrasing)
+3. **List complementary suggestions and their outcome**:
 
 ```
 ## Complementary suggestions
 
 | Suggestion | Source | Status |
 |------------|--------|--------|
-| [proposed idea] | [role that raised it] | ✅ Adopted / ❌ Rejected / 🔍 To investigate |
+| [proposed idea] | [role] | ✅ Adopted / ❌ Rejected / 🔍 To investigate |
 ```
 
-4. **Assess the readiness level**:
-   - ✅ **Ready** → continue to step 5
-   - ⚠️ **Blockers** → list what is blocking and propose a path forward
+4. **Readiness check**:
+   - ✅ **Ready** → continue to Step 4
+   - ⚠️ **Blockers** → list what is blocking, propose a path forward; do NOT advance until resolved
 
 ---
 
-### 5. Technical Plan — The HOW (MANDATORY)
+## Step 4 — Technical Plan
 
-After the AC synthesis, first identify the **story type**, then write the adapted plan.
+Identify the **story type** then write the adapted plan. Write **only the relevant sections** for the detected type — do not generate empty sections.
 
-#### 5a. Type identification
+### Story type
 
-Determine the impacted domain(s) — a story can cover several:
-
-| Domain | Signal in code / story |
-|--------|------------------------|
+| Domain | Signal |
+|--------|--------|
 | `backend` | API endpoints, services, background workers, ORM models |
 | `frontend` | UI components, state stores, pages, CSS/styling |
-| `database` | Migrations, schemas, indexes, SQL/graph queries |
-| `devops` | Dockerfile, docker-compose, CI/CD scripts (GitHub Actions), Makefile |
+| `database` | Migrations, schemas, indexes, SQL queries |
+| `devops` | Dockerfile, docker-compose, CI/CD scripts, Makefile |
 | `infrastructure` | Env vars, nginx/caddy configs, third-party services, secrets |
 | `architecture` | Inter-module refactoring, cross-cutting patterns, restructuring |
 | `bugfix` | Correction of existing behavior — limited and precise scope |
 | `security` | Auth, permissions, encryption, rate limiting, audit |
 | `docs` | README, guides, docstrings, OpenAPI descriptions |
 
-#### 5b. Plan adapted to the type
-
-Write **only the relevant sections** for the detected type. Do not generate empty sections.
-
----
+### Plan per type
 
 **For `backend`:**
 - Files to create/modify (exact paths)
@@ -131,6 +94,12 @@ Write **only the relevant sections** for the detected type. Do not generate empt
 - API contracts: `METHOD /path` — auth required — request schema — response schema — error codes
 - Background workers: task name, queue, retry policy if applicable
 - Implementation sequence: model → service → route → tests
+- **Integration tests — ⚠️ MANDATORY** — every new API endpoint must include:
+  - Minimum 1 happy-path integration test (expected 2xx)
+  - Minimum 1 error-case test (invalid input → 4xx)
+  - Edge case tests: duplicate, missing auth, non-admin access, not-found
+  - Tests use `httpx.AsyncClient` with `ASGITransport` (FastAPI TestClient pattern)
+  - Auth tokens created via DB fixture + `AuthService.create_access_token()`, NOT via the register endpoint (avoids rate limiters)
 
 **For `frontend`:**
 - UI components to create/modify (exact paths)
@@ -139,13 +108,14 @@ Write **only the relevant sections** for the detected type. Do not generate empt
 - Design system: CSS tokens and reference components (see `AGENTS.md`)
 - Sequence: store → component → page → tests
 - **E2E tests (Playwright + mock API via `page.route()`) — ⚠️ MANDATORY**
-  - Chaque AC couvrant une page ou un flux utilisateur DOIT être tagué `[E2E]`
-  - Minimum 1 test nominal + tests aux bornes (validation d'erreur, cas vides, timeouts)
-  - Le mock API doit couvrir tous les appels backend du scénario testé
+  - Every AC covering a page or user flow must be tagged `[UI-INT]`
+  - Minimum 1 nominal test + boundary tests (validation error, empty states, timeouts)
+  - Mock API must cover all backend calls in the tested scenario
 
 **For `database`:**
 - Schema before / after (columns, types, constraints, indexes)
-- Migration script (tool per stack, see `AGENTS.md`)
+- Migration script: use the tool defined in `AGENTS.md` for this stack
+- Verification command: use the DB introspection command defined in `AGENTS.md` (stack-specific)
 - Impact on existing queries
 - Rollback strategy
 
@@ -177,43 +147,34 @@ Write **only the relevant sections** for the detected type. Do not generate empt
 - Target audience and expected level of detail
 - Required code examples or diagrams
 
----
-
 **Common fields (always present):**
-- Files to create / modify / delete (exhaustive list with paths)
+- Files to create / modify / delete (exhaustive list with exact paths — no stubs like `src/...`)
 - New dependencies (package + version + reason) — or "none"
-- Ordered implementation sequence (numbered steps)
+- Ordered implementation steps — each step must map to ≤ 1 file or 1 test fixture
+- If `database` is in scope, steps MUST include:
+  - Apply migration: use the command from `AGENTS.md` / `.opencode/rules/commands.md`
+  - Verify migration applied: use the DB introspection command for this stack (see `AGENTS.md`)
+  - Verify rollback: run downgrade then upgrade (or equivalent per stack)
 - Constraints: imposed patterns, what NOT to do, performance thresholds
 
 ---
 
-### 6. Persistence
+## Step 5 — Persistence
 
-At the end of refinement, persist EVERYTHING in a single call.
+Persist everything in a single `kanban-update-story` call.
 
 > **Note:** The `"stack"` field must mirror exactly the content of `implementation_guide.scope` — this is what the dashboard displays as card categories.
 
-> ⚠️ **Description must be valid markdown** — rendered in the Kanban modal. Use `\n\n` between sections and `\n` between a heading and its body. Minimum expected structure:
-> ```
-> ## User Story
-> **En tant que** [rôle], je veux [fonctionnalité], afin de [bénéfice].
->
-> ## Contexte
-> [Refined context after dialogue — what the story covers and why.]
->
-> ## Décisions clés
-> - [Decision 1 from refinement]
-> - [Decision 2 from refinement]
-> ```
+> ⚠️ **Description must be valid Markdown** — rendered in the Kanban modal. Use `\n\n` between sections and `\n` between a heading and its body.
 
 ```python
 kanban-update-story("$ARGUMENTS", '{
   "_actor": "refine",
-  "description": "## User Story\n**En tant que** [rôle], je veux [fonctionnalité], afin de [bénéfice].\n\n## Contexte\n[Refined context after dialogue.]\n\n## Décisions clés\n- [Decision 1]\n- [Decision 2]",
+  "description": "## User Story\n**As a** [role], I want [feature], so that [benefit].\n\n## Context\n[Refined context after dialogue — what the story covers and why.]\n\n## Key decisions\n- [Decision 1 from refinement]\n- [Decision 2 from refinement]",
   "stack": ["backend", "database"],
   "acceptance_criteria": [
-    {"id": 1, "text": "Revised AC 1 [E2E]", "checked": false},
-    {"id": 2, "text": "Revised AC 2", "checked": false}
+    {"id": 1, "text": "AC 1 as a testable assertion [UI-INT]", "checked": false},
+    {"id": 2, "text": "AC 2 as a testable assertion", "checked": false}
   ],
   "refine_decisions": [
     "Decision 1 made during refinement",
@@ -222,7 +183,7 @@ kanban-update-story("$ARGUMENTS", '{
   "implementation_guide": {
     "type": "backend | frontend | fullstack | database | devops | infrastructure | architecture | bugfix | security | docs",
     "scope": ["backend", "database"],
-    "approach": "Description of the chosen technical approach",
+    "approach": "Description of the chosen technical approach — specific enough that two developers would implement it the same way",
     "files_create": [
       {"path": "exact/path/file.py", "role": "Role of the file"}
     ],
@@ -237,38 +198,44 @@ kanban-update-story("$ARGUMENTS", '{
     "devops_changes": [],
     "dependencies": [],
     "steps": [
-      "1. First step",
+      "1. First step (1 file or 1 test fixture)",
       "2. Second step"
     ],
-    "test_strategy": "What to test, which test type (unit/integration/e2e/smoke), which tool. For frontend stories: E2E tests (Playwright + mocked API) are ⚠️ MANDATORY — au moins 1 test nominal + tests aux bornes",
+    "test_strategy": {
+      "unit": "What to unit-test and with which tool — or null if not applicable",
+      "integration": "Which endpoints/services to integration-test — tool, auth fixture approach, minimum cases",
+      "e2e": "Which user flows to cover with Playwright — nominal + boundary cases, mocked routes — or null if not applicable",
+      "coverage_target": 80,
+      "critical_cases": ["Edge case 1 that must not regress", "Edge case 2"]
+    },
     "constraints": "What not to do, imposed patterns, performance thresholds"
   }
 }')
 ```
+
+### Implementation guide quality gate
+
+**Before calling `kanban-move-story` to advance**, verify every item:
+
+- [ ] `files_create` and `files_modify` have exact paths (no `src/...` stubs)
+- [ ] `steps` are granular enough that each maps to ≤ 1 file or 1 test fixture
+- [ ] `test_strategy` has content in every relevant field — not a generic sentence
+- [ ] `critical_cases` lists at least the edge cases identified during the dialogue
+- [ ] Every AC is a testable assertion — no "user can..." phrasing
+- [ ] `approach` is specific enough that two developers would implement it the same way
+
+If any item fails: revise before advancing.
+
+---
 
 **Advance to threat model:**
 - **Called via `/next-story` orchestrator** (the calling context explicitly says "Orchestrator context") → call `kanban-move-story("$ARGUMENTS", "secops_tm", "refine")` and return the report. The orchestrator continues.
 - **Called standalone** → ask:
   > "✅ Refinement complete — [N] ACs validated. Proceed to threat model (`secops_tm`)? [yes / no]"
   - **yes** → `kanban-move-story("$ARGUMENTS", "secops_tm", "refine")` → run `/secops "$ARGUMENTS" mode=threat-model`
-  - **no** → stop. "To continue later: drag to `secops_tm` or run `/next-story secops-tm $ARGUMENTS`"
+  - **no** → stop. "To continue later: drag the card to `secops_tm` on the dashboard."
 
-## Anti-patterns
-
-❌ **Don't**: List 8 questions in a single text message
-✅ **Do**: Use the `question` tool each time, one question per call
-
-❌ **Don't**: Ask yes/no questions with no proposal
-✅ **Do**: "Option A, Option B, Option C — which do you prefer?"
-
-❌ **Don't**: Accept the first answer without challenging
-✅ **Do**: If the answer is vague, follow up with a sub-question to clarify
-
-❌ **Don't**: Only challenge ACs without proposing any additions
-✅ **Do**: Each role proposes at least one new idea the ACs had not anticipated
-
-❌ **Don't**: Ignore adjacent stories that could cross-pollinate this one
-✅ **Do**: Read stories from the same phase and direct dependencies before asking any question
+---
 
 ## DevSecOps Reference
 
@@ -288,6 +255,12 @@ When wearing the DevSecOps hat, draw from these questions based on the story:
 - Are external API keys in env vars, never hardcoded?
 - Are incoming webhooks authenticated (signature, IP whitelist)?
 - Is rate limiting planned?
+
+**Database migrations (⚠️ MANDATORY for any story with `database` in scope):**
+- How will the migration be applied to the existing dev database?
+- What verification confirms the migration was applied successfully?
+- Is there a rollback strategy if the migration fails?
+- Does the test suite validate the migration against a pre-existing DB (not just `create_all` on a fresh DB)?
 
 **Admin:**
 - Do destructive actions require confirmation / soft-delete?

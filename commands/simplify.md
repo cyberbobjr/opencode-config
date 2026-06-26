@@ -65,4 +65,4 @@ After the report is written:
 - **Called standalone** → ask:
   > "✅ Simplify complete — [N] issues found, [N] fixed. Move to `commit_ready` and commit? [yes / no]"
   - **yes** → `kanban-move-story("$ARGUMENTS", "commit_ready", "simplify")` → propose a conventional commit message → stage and commit
-  - **no** → stop. "To commit later: drag to `commit_ready` or run `/next-story commit $ARGUMENTS`"
+  - **no** → stop. "To commit later: drag the card to `commit_ready` on the dashboard."

@@ -119,7 +119,7 @@ kanban-update-story("[story_id]", '{"_actor": "secops-tm", "secops_report": {"mo
 - If `review_required: false` and **called standalone** → ask:
   > "✅ Threat model — no blocking risk. Proceed to TDD implementation? [yes / no]"
   - **yes** → `kanban-move-story("[story_id]", "tdd", "secops-tm")`
-  - **no** → stop. "To continue later: drag to `tdd` or run `/next-story implement [story_id]`"
+  - **no** → stop. "To continue later: drag the card to `tdd` on the dashboard."
 
 ---
 
@@ -174,7 +174,7 @@ Display the SecOps CR report returned by the subagent.
 - If `passed` or `skipped` and **called standalone** → ask:
   > "✅ SecOps code review — [passed/skipped]. Proceed to QA validation? [yes / no]"
   - **yes** → `kanban-move-story("[story_id]", "qa", "secops-cr")` → run `/qa [story_id]`
-  - **no** → stop. "To continue later: drag to `qa` or run `/next-story qa [story_id]`"
+  - **no** → stop. "To continue later: drag the card to `qa` on the dashboard."
 
 ## Reminders
 

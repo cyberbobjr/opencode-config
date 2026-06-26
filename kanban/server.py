@@ -168,13 +168,13 @@ OPENCODE_TRIGGER_ENABLED = os.environ.get("OPENCODE_TRIGGER_ENABLED", "1") == "1
 
 
 STATUS_COMMANDS = {
-    "refining":     lambda sid: ("next-story", f"refine {sid}"),
-    "secops_tm":    lambda sid: ("next-story", f"secops-tm {sid}"),
-    "tdd":          lambda sid: ("next-story", f"implement {sid}"),
-    "secops_cr":    lambda sid: ("next-story", f"secops-cr {sid}"),
-    "qa":           lambda sid: ("next-story", f"qa {sid}"),
-    "simplify":     lambda sid: ("next-story", f"simplify {sid}"),
-    "commit_ready": lambda sid: ("next-story", f"commit {sid}"),
+    "refining":     lambda sid: ("refine", sid),
+    "secops_tm":    lambda sid: ("secops", f"{sid} mode=threat-model"),
+    "tdd":          lambda sid: ("tdd", sid),
+    "secops_cr":    lambda sid: ("secops", f"{sid} mode=code-review"),
+    "qa":           lambda sid: ("qa", sid),
+    "simplify":     lambda sid: ("simplify", sid),
+    "commit_ready": lambda sid: ("commit", sid),
 }
 
 

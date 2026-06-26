@@ -1,37 +1,17 @@
 ---
-description: Coordinates the user story workflow — refinement, TDD implementation, QA, quality gates, commit
+description: Project status view and full-cycle story orchestrator (refine → secops-tm → tdd → secops-cr → qa → simplify → commit). Individual steps are triggered directly by the Kanban dashboard on card drag.
 argument:
   optional: true
-  description: "Sub-command: status (default), dashboard, US X.Y (e.g. 'US 1.3'), refine, secops-tm, implement, secops-cr, qa, simplify, commit, done, block, notes"
+  description: "US X.Y for full cycle, blank for project status"
 ---
 
-# Next Story — Workflow Coordinator
+# Next Story — Status & Full-Cycle Orchestrator
 
-> Requires the Kanban server: `python .opencode/kanban/server.py`
->
-> All drag-and-drop actions on the Kanban dashboard route through `/next-story` with the matching sub-command.
->
 > **Invocation**:
-> - `/next-story` → Project status + next story
-> - `/next-story US 1.3` → Full cycle (refinement → TDD → SecOps → QA → quality gates → commit)
-> - `/next-story refine US 1.3` → Refinement + threat model, then stop *(drag → refining)*
-> - `/next-story secops-tm US 1.3` → Threat model only, then advance to tdd *(drag → secops_tm)*
-> - `/next-story implement US 1.3` → TDD → SecOps CR → QA → simplify → commit *(drag → tdd)*
-> - `/next-story secops-cr US 1.3` → Code review only, then advance to qa *(drag → secops_cr)*
-> - `/next-story qa US 1.3` → QA validation, then advance to simplify *(drag → qa)*
-> - `/next-story simplify US 1.3` → Quality gates only + move to `commit_ready` *(drag → simplify)*
-> - `/next-story commit US 1.3` → Quick commit + done *(drag → commit_ready)*
-> - `/next-story done US 1.3` → Mark as completed without commit
-> - `/next-story block US 1.3` → Block the story
-> - `/next-story notes US 1.3` → Add a note to the story
-> - `/feature "description"` → Create and implement a new feature (Backlog Phase 7)
-> - `/fix "description"` → Create and fix a bug (Backlog Phase 7)
-> - `/change "description"` → Create a change User Story with impact analysis (Backlog Phase 7)
-> - `/refine US X.Y` → Dedicated Refinement Agent (challenges ACs)
-> - `/tdd US X.Y` → TDD Agent (red-green-refactor)
-> - `/qa US X.Y` → QA Agent (AC validation through tests)
-> - `/simplify` → Quality / reuse / efficiency review
-> - `/secops US X.Y` → DevSecOps Agent (threat-model or code-review)
+> - `/next-story` → Project status + next story to process
+> - `/next-story US X.Y` → Full cycle (refinement → TDD → SecOps → QA → quality gates → commit)
+>
+> All other steps (refine, secops-tm, tdd, secops-cr, qa, simplify, commit) are **triggered directly** by the Kanban dashboard when cards are dragged between columns.
 
 ## General Rules
 
@@ -65,11 +45,6 @@ argument:
 1. Call the `kanban-get-stats` MCP tool for global stats
 2. Call `kanban-get-next-pending` for the next story
 3. Display the result and ask if the user wants to start
-
-### `/next-story dashboard` — HTML Dashboard
-
-1. Open http://localhost:8765/ in the browser
-2. If the server is not running: prompt to run `python .opencode/kanban/server.py`
 
 ### `/next-story US X.Y` — Full cycle
 
@@ -180,108 +155,3 @@ Execute each step **actively and sequentially**.
 2. After validation: `git add .` then `git commit -m "..."` (or `/commit`)
 3. Call `kanban-move-story("US X.Y", "completed", "commit")`
 4. Display the next available story
-
-### `/next-story refine US X.Y` — Refinement only *(drag → refining)*
-
-1. Check status via `kanban-get-story("US X.Y")`
-   - If not yet `refining`: call `kanban-move-story("US X.Y", "refining")`
-   - If already `refining`: continue directly (dashboard or MCP already did the move)
-2. Delegate to `/refine US X.Y`
-   > ⚠️ **Orchestrator context**: after /refine completes, do NOT ask about advancing — next-story handles the move to `secops_tm`.
-3. Call `kanban-move-story("US X.Y", "secops_tm")`
-4. Display the report and stop
-
-### `/next-story secops-tm US X.Y` — Threat model only *(drag → secops_tm)*
-
-Used when the dashboard moves a card to the `secops_tm` column (refinement already done).
-
-1. Check status via `kanban-get-story("US X.Y")`
-   - If not yet `secops_tm`: call `kanban-move-story("US X.Y", "secops_tm")`
-   - If already `secops_tm`: continue directly
-2. Run `/secops "US X.Y" mode=threat-model`
-   > ⚠️ **Orchestrator context**: after /secops completes, do NOT ask about advancing — next-story handles the move to `tdd`.
-3. If `review_required: true` → display Security Brief and **[STOP]** — wait for user validation
-4. Call `kanban-move-story("US X.Y", "tdd")`
-5. Display summary — story is ready for implementation
-
-### `/next-story implement US X.Y` — Implementation only (Steps 2→5) *(drag → tdd)*
-
-1. Check the story status via `kanban-get-story("US X.Y")`
-2. If not yet refined (status `pending` or `refining`): "This story must be refined first."
-3. If already `tdd`: continue directly (dashboard already did the move)
-   Otherwise: call `kanban-move-story("US X.Y", "tdd")`
-4. Proceed with steps 2→3→4→5 (TDD → SecOps CR → QA → quality gates → commit)
-5. The QA→TDD corrective loop is active
-
-### `/next-story secops-cr US X.Y` — Code review only *(drag → secops_cr)*
-
-Used when the dashboard moves a card to the `secops_cr` column (TDD already passed).
-
-1. Check status via `kanban-get-story("US X.Y")`
-   - If not yet `secops_cr`: call `kanban-move-story("US X.Y", "secops_cr")`
-   - If already `secops_cr`: continue directly
-2. Run `/secops "US X.Y" mode=code-review`
-   > ⚠️ **Orchestrator context**: after /secops completes, do NOT ask about advancing — next-story handles the move to `qa`.
-3. If critical issues found → **[STOP]** ask user how to proceed (fix or force-pass)
-4. Call `kanban-move-story("US X.Y", "qa")`
-5. [AUTO] continue with `/next-story qa US X.Y`
-
-### `/next-story qa US X.Y` — QA validation only *(drag → qa)*
-
-Used when the dashboard moves a card to the `qa` column.
-
-1. Check status via `kanban-get-story("US X.Y")`
-   - If not yet `qa`: call `kanban-move-story("US X.Y", "qa")`
-   - If already `qa`: continue directly
-2. Call `kanban-update-story("US X.Y", '{"qa": {"status": "in_progress"}}')`
-3. Delegate to `/qa US X.Y`
-   > ⚠️ **Orchestrator context**: after /qa completes, do NOT ask about advancing — next-story handles the move to `simplify`.
-4. **Branch based on result:**
-   - QA PASSED → `kanban-update-story` qa.status=passed → `kanban-move-story("US X.Y", "simplify")` → [AUTO] `/next-story simplify US X.Y`
-   - QA FAILED → display failures → **[STOP]** ask: fix (back to TDD) / block / force-pass
-
-### `/next-story simplify US X.Y` — Quality Gates (triggered from dashboard) *(drag → simplify)*
-
-Run quality gates for the story and move it to `commit_ready` when all pass.
-Used when the dashboard moves a card to the `simplify` column.
-
-1. Retrieve context via `kanban-get-story("US X.Y")`
-2. Run the commands listed in `.opencode/rules/commands.md` section "Quality Gates" → "Avant chaque push / PR"
-3. Run `/simplify US X.Y` — passes the story ID so the report is written to the story
-   > ⚠️ **Orchestrator context**: after /simplify completes, do NOT ask about advancing — next-story moves to `commit_ready` and displays the summary.
-4. Fix any issues found
-5. Call `kanban-move-story("US X.Y", "commit_ready", "simplify")`
-6. Display summary — the story is ready for commit
-
----
-
-### `/next-story commit US X.Y` — Quick commit
-
-1. Verify that quality gates pass
-2. Propose a conventional commit message
-3. `git add . && /commit`
-4. `kanban-move-story("US X.Y", "completed", "commit")`
-
-### `/next-story done US X.Y` — Mark as completed without commit
-
-1. `kanban-move-story("US X.Y", "completed", "dashboard")`
-2. Display the next story
-
-### `/next-story block US X.Y` — Block a story
-
-1. `kanban-move-story("US X.Y", "blocked")`
-2. Ask: "Add a note explaining the blocker?"
-
-### `/next-story notes US X.Y` — Add a note
-
-1. Call `kanban-get-story("US X.Y")` to retrieve the story
-2. Ask for the note
-3. Call `kanban-update-story("US X.Y", '{"_actor": "user", "notes": "the note"}')`
-
----
-
-The full workflow in `.opencode/rules/workflow.md` (section "Cycle d'une Story") describes the optimal cycle. The fastest path remains:
-
-```
-/next-story US X.Y
-```
