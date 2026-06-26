@@ -83,9 +83,8 @@ Description courte du problème ou de la fonctionnalité.
   ▸ kanban-move-story("US X.Y", "qa")
 
 Étape 3 : Quality Gates + QA
-  ▸ cd backend && ruff check && ruff format --check && mypy app
-  ▸ cd frontend && npx eslint src && npx prettier --check src && npx vue-tsc --noEmit
-  ▸ pytest && npx vitest
+  ▸ Run lint + type check + format check (see .opencode/rules/commands.md for commands)
+  ▸ Run full test suite for all layers (see .opencode/rules/commands.md)
   ▸ /qa US X.Y                         → Valide les AC
   ▸ kanban-update-story("US X.Y", '{"qa": {"status": "passed", ...}}')
   ▸ kanban-move-story("US X.Y", "simplify")

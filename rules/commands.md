@@ -1,103 +1,94 @@
-# Commandes & Démarrage
+# Commands & Project Setup
 
-## Prérequis
+> **Project-specific commands are in `AGENTS.md`** at the project root.
+> Read it before running anything. The sections below describe the expected categories and generic patterns.
 
-- Python ≥ 3.12, [uv](https://docs.astral.sh/uv/), Node.js ≥ 20
-- Docker + Docker Compose, Neo4j 5.26+, Redis 7
-- Clés API : DeepSeek, OpenRouter, Firecrawl (dans `.env`)
+---
 
-## Installation
+## Setup
 
-```bash
-git clone git@github.com:cyberbobjr/news-briefing-saas.git && cd news-briefing-saas
-cp .env.example .env          # → Éditer avec vos clés API
-cd backend && uv venv && source .venv/bin/activate && uv sync
-cd ../frontend && npm install
-cd ../backend && alembic upgrade head
-```
+Read `AGENTS.md` for:
+- Prerequisites (runtime versions, tools)
+- Installation steps
+- Required environment variables and their purpose (copy `.env.example` → `.env`)
 
-## Commandes Backend (`cd backend`)
+---
 
-| Commande | Action |
-|----------|--------|
-| `uvicorn app.main:app --reload` | Serveur dev |
-| `uv run news --reload --port 8000` | Serveur dev (alias) |
-| `pytest` | Tests unitaires + intégration |
-| `pytest --cov=app --cov-report=term-missing` | Couverture |
-| `pytest --celery` | Tests avec Celery + Redis mocké |
-| `ruff check` | Lint |
-| `ruff format --check` | Vérification format |
-| `ruff format` | Auto-format |
-| `mypy app` | Type checking |
-| `alembic upgrade head` | Migrer la BDD |
-| `alembic revision --autogenerate -m "message"` | Nouvelle migration |
-| `uv run celery` | Démarrer worker + Beat |
-| `uv run celery flower` | Monitoring Flower (http://localhost:5555) |
-| `uv run celery beat -l info` | Scheduler Celery Beat seul |
+## Backend
 
-## Commandes Frontend (`cd frontend`)
+Typical commands (actual values in `AGENTS.md`):
 
-| Commande | Action |
-|----------|--------|
-| `npm run dev` | Serveur dev (Vite) |
-| `npm run build` | Build prod |
-| `npx vitest` | Tests unitaires |
-| `npx vitest --coverage` | Couverture |
-| `npx vue-tsc --noEmit` | Type check TypeScript |
-| `npx eslint src` | Lint |
-| `npx prettier --check src` | Vérification format |
-| `npx prettier --write src` | Auto-format |
-| `npx playwright test` | UI-INT |
+| Category | What to look for |
+|----------|-----------------|
+| Dev server | Hot-reload development server |
+| Tests | Unit + integration test runner with coverage |
+| Lint | Code linter (fail on errors) |
+| Format check | Formatter in check mode (no changes) |
+| Type check | Static type checker |
+| Migration apply | Apply pending schema migrations to the dev DB |
+| Migration create | Generate a new migration from model changes |
+| Background workers | Start task queue workers (if applicable) |
+
+---
+
+## Frontend
+
+Typical commands (actual values in `AGENTS.md`):
+
+| Category | What to look for |
+|----------|-----------------|
+| Dev server | Vite / webpack dev server with HMR |
+| Build | Production bundle |
+| Unit tests | Component and utility tests with coverage |
+| Type check | TypeScript compiler in no-emit mode |
+| Lint | ESLint (fail on errors) |
+| Format check | Prettier in check mode |
+| UI-INT tests | Playwright end-to-end / UI integration tests |
+
+---
+
+## API Discovery
+
+Read `AGENTS.md` for the command that lists available routes (typically `curl localhost:<port>/openapi.json`). Always check before creating a new endpoint to avoid conflicts.
+
+---
 
 ## Kanban
 
-| Commande | Action |
-|----------|--------|
-| `python .opencode/kanban/server.py` | Serveur Kanban (http://localhost:8765) |
-| `python .opencode/kanban/server.py --mcp` | Mode MCP stdio + HTTP en arrière-plan |
+```bash
+python .opencode/kanban/server.py          # Dashboard at http://localhost:8765/
+python .opencode/kanban/server.py --mcp    # MCP stdio mode + HTTP in background
+```
 
-## Docker
+---
 
-| Commande | Action |
-|----------|--------|
-| `docker compose --profile dev up -d` | Démarrer services dev (5 conteneurs) |
-| `docker compose --profile prod up -d` | Démarrer services prod |
-| `docker compose down` | Arrêter |
-| `docker compose logs -f` | Logs en temps réel |
-| `docker compose logs -f backend` | Logs backend |
-| `docker compose logs -f celery-worker` | Logs workers Celery |
-| `docker compose logs -f neo4j` | Logs Neo4j |
-| `docker compose exec backend pytest` | Tests dans le conteneur |
-| `docker compose exec backend celery -A workers.celery_app inspect active` | Inspecter tâches Celery |
+## Docker / Infrastructure
+
+Read `AGENTS.md` for Docker Compose profiles and service names. Generic patterns:
+
+```bash
+docker compose --profile dev up -d   # Start dev services
+docker compose down                  # Stop all
+docker compose logs -f               # Stream logs
+docker compose exec <service> <cmd>  # Run command in container
+```
+
+---
 
 ## Quality Gates
 
-### Avant chaque commit
+### Before each commit
 
-```bash
-cd backend && ruff check && ruff format --check && mypy app
-cd frontend && npx eslint src && npx prettier --check src && npx vue-tsc --noEmit
-```
+Run the full lint + type check + format check sequence for each layer. See `AGENTS.md` for the exact commands. Also:
+- Apply any pending schema migrations if the story touches the database
+- Verify no migration is pending: use the detection command from `AGENTS.md` (do NOT apply migrations blindly in QA)
 
-### Avant chaque push / PR
+### Before each push / PR
 
-```bash
-cd backend && pytest --cov=app --cov-report=term-missing --cov-fail-under=80
-cd frontend && npx vitest --coverage --coverage.threshold.100.branches=80
-npm run test:ui-int
-# python scripts/audit-storybook-usage.py --exit-code  # À ajouter dans le projet cible (script non inclus dans ce template)
-# cd frontend && npx storybook build --quiet            # À adapter selon la structure du projet cible
-```
+Run the full test suite with coverage for all layers. Minimum threshold: **80%** line coverage. See `AGENTS.md` for the exact test runner commands.
 
-## Déploiement
+---
 
-```bash
-./scripts/deploy-vps.sh
-# 1. rsync vers VPS
-# 2. docker compose --profile prod down && up -d --build
-# 3. alembic upgrade head
-# 4. Vérifier GET /api/health → 200
+## Deployment
 
-# Backup quotidien (cron VPS)
-sqlite3 /data/newscap.db ".backup '/backups/newscap-$(date +%Y%m%d).db'"
-```
+Read `AGENTS.md` for the deployment procedure (scripts, targets, health check endpoint).

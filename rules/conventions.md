@@ -12,7 +12,6 @@
 | Routes | 1 endpoint = 1 fonction, préfixe `/api/` |
 | Services | Logique métier dans `services/`, pas dans les routes |
 | Tâches Celery | Infrastructure dans `workers/`, logique métier dans `services/` |
-| Graphiti | Tout accès Neo4j passe par `services/graphiti_adapter.py` |
 | Async | Privilégier async/await partout |
 | Configuration | pydantic-settings, lue depuis `.env` |
 
@@ -28,7 +27,7 @@
 | Routes | Vue Router, lazy-loaded |
 | i18n | `vue-i18n`, fichiers JSON dans `locales/` |
 | CSS | TailwindCSS utility-first |
-| Design system | Tokens définis dans `docs/design-system.md` + rendu dans `docs/designs/d-hybrid.html` |
+| Design system | Tokens and component catalog defined in the project's design system — see `AGENTS.md` for the exact location |
 | Storybook | `.stories.ts` obligatoire pour chaque composant `.vue` — créer/modifier/supprimer en miroir |
 
 ## Storybook — Règle Impérative
