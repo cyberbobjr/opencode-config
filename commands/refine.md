@@ -37,6 +37,75 @@ Before the first question, signal that user interaction is needed:
 kanban-update-story("$ARGUMENTS", '{"agent_status": "awaiting_input"}')
 ```
 
+### UI Wireframe (frontend / fullstack stories only)
+
+**If the story type is `frontend` or `fullstack`**, generate an HTML wireframe and open it **before Q1** so the visual layout anchors the dialogue.
+
+1. Write a self-contained HTML file to `/tmp/wireframe-$ARGUMENTS.html` using this template — fill in the `<div class="screen">` with the UI elements inferred from the description and ACs:
+
+```html
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Wireframe — STORY_ID</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: system-ui, sans-serif; background: #f0f0f0; padding: 24px; color: #333; }
+  h1 { font-size: 12px; color: #999; margin-bottom: 20px; font-weight: normal; text-transform: uppercase; letter-spacing: 1px; }
+  .screen { background: white; border: 2px solid #bbb; border-radius: 8px; width: 390px; min-height: 600px; overflow: hidden; box-shadow: 0 4px 16px rgba(0,0,0,.12); }
+  .navbar { background: #e0e0e0; height: 52px; display: flex; align-items: center; padding: 0 16px; gap: 12px; }
+  .navbar .title { font-weight: 600; font-size: 16px; color: #555; flex: 1; }
+  .navbar .action { background: #ccc; border-radius: 4px; padding: 6px 12px; font-size: 12px; color: #666; }
+  .body { padding: 16px; }
+  .section-label { font-size: 11px; color: #999; text-transform: uppercase; letter-spacing: .5px; margin-bottom: 8px; margin-top: 16px; }
+  .card { background: #f5f5f5; border: 1px solid #ddd; border-radius: 6px; padding: 14px; margin-bottom: 10px; }
+  .field-label { font-size: 11px; color: #999; text-transform: uppercase; letter-spacing: .5px; margin-bottom: 4px; }
+  .field { border: 1px solid #ccc; border-radius: 4px; padding: 10px; background: #fafafa; color: #bbb; font-size: 13px; margin-bottom: 10px; }
+  .btn { background: #ccc; border-radius: 4px; padding: 10px 18px; font-size: 13px; color: #666; display: inline-block; margin: 4px 4px 4px 0; cursor: default; }
+  .btn.primary { background: #777; color: white; }
+  .btn.danger { background: #e0a0a0; color: #800; }
+  .tag { background: #e4e4e4; border-radius: 10px; padding: 3px 10px; font-size: 11px; color: #777; display: inline-block; margin: 2px; }
+  .row { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
+  .placeholder { background: #e8e8e8; border-radius: 3px; height: 13px; }
+  .placeholder.short { width: 55%; }
+  .placeholder.long { width: 90%; }
+  .divider { border-top: 1px solid #eee; margin: 14px 0; }
+  .hint { font-size: 11px; color: #bbb; font-style: italic; margin-top: 6px; }
+  .badge { background: #ddd; border-radius: 10px; padding: 2px 8px; font-size: 11px; color: #666; }
+  .empty { text-align: center; color: #ccc; font-size: 13px; padding: 32px 0; }
+</style>
+</head>
+<body>
+<h1>Wireframe · STORY_ID · STORY_TITLE</h1>
+<div class="screen">
+  <!-- Build the UI using the classes above.
+       Represent every element mentioned in the ACs.
+       Label all buttons, fields, and sections.
+       Use .placeholder divs for list content (news items, cards, etc.).
+       No real icons, no brand colors — gray-box only. -->
+</div>
+</body>
+</html>
+```
+
+2. Open the file in the browser:
+   ```bash
+   open /tmp/wireframe-$ARGUMENTS.html
+   ```
+
+3. Reference it at the start of **Q1**:
+   > *"J'ai ouvert une maquette dans ton navigateur (`wireframe-$ARGUMENTS.html`). Elle représente ma lecture initiale de l'écran : [description courte du layout]. Ma première question porte sur..."*
+
+**Rules for the HTML:**
+- **Gray-box only** — no brand colors, no icons — every interactive element must be a labeled text box
+- **Represent all ACs** — every UI element mentioned in an acceptance criterion must appear
+- **Mobile-first (390 px)** unless the story explicitly targets desktop or a specific breakpoint
+- **Use `.placeholder` divs for list content** — don't invent real content
+- **No external dependencies** — fully self-contained, no CDN, no JS
+
+---
+
 Ask **4 to 6 questions** (up to 8 for complex stories). Each question uses the OpenCode `question` tool.
 
 | Question | Lead role | Challenge objective | Ideation mission |
@@ -165,6 +234,7 @@ Identify the **story type** then write the adapted plan. Write **only the releva
   - Verify `celery_cli.py` and `docker-compose.yml` worker startup commands consume every declared queue via the `-Q` flag
   - If a new queue is introduced, verify no other task module was already using it to avoid unintended cross-consumption
 - Constraints: imposed patterns, what NOT to do, performance thresholds
+- 🔁 **Cross-cutting services check**: If the story uses a shared infrastructure client (Firecrawl, LLM, DB, Redis, Neo4j, email), verify it is consumed through a **dedicated service wrapper** (`app/services/*.py`), not via ad-hoc instantiation. Cross-reference existing consumers with `grep` to detect inconsistent patterns before writing code. If 2+ modules instantiate the same client independently, create/extend a shared service in this story.
 
 ---
 
@@ -292,3 +362,4 @@ When wearing the DevSecOps hat, draw from these questions based on the story:
 - Does the story introduce a new dependency? Are there known CVEs?
 - Are LLM templates (prompts) protected against injection?
 - Is the principle of least privilege respected?
+- 🔁 **Shared service audit**: If the story touches a client already used elsewhere (Firecrawl, SMTP, Neo4j, Redis, LLM), check that all consumers use a single service wrapper. Ad-hoc instantiation in multiple files = inconsistency risk + config drift.
