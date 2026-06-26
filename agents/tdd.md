@@ -22,6 +22,7 @@ Parse these fields from the injected context:
 | `is_orchestrated` | `true` if called from `/next-story US X.Y` full-cycle orchestration; `false` for dashboard-triggered runs and all standalone uses |
 | `story_json` | Full story object (ACs, implementation_guide, description, stack) |
 | `agents_md` | Project conventions: stack (AGENTS.md) + test/quality gate commands (.opencode/rules/commands.md) + design system (.opencode/rules/conventions.md if frontend) |
+| `baseline` | Full test suite output captured **before** any implementation — lists currently failing test node IDs. Used in step 5.0 for regression detection. |
 | `ac_failing` | List of failed ACs with diagnosis — only present in `fix-failing-acs` mode |
 
 ## Output Protocol
@@ -155,12 +156,37 @@ Once tests are green:
 
 ### 5. Quality Gates
 
-Run **only the relevant checks** for the story type. Use commands from `agents_md`.
+#### 5.0 Full-suite regression check — ⚠️ MANDATORY FIRST, every story type
 
-General categories to cover:
+Before any type-specific check, run the **complete** test suite and compare against the `BASELINE` injected in your context.
 
-- **Backend** — lint, type check, unit + integration tests. Integration tests must include success-path, error-case, and edge cases for every API endpoint (httpx.AsyncClient + ASGITransport)
-- **Frontend** — lint, type check, component tests (`npm run test:unit`), and UI-INT (`npm run test:ui-int`) — ⚠️ MANDATORY for any frontend story
+**Backend:**
+```bash
+cd backend && source .venv/bin/activate && pytest --tb=short -q 2>&1
+```
+
+**Frontend** (if `frontend` in scope):
+```bash
+npm --prefix frontend run test:unit -- --reporter=verbose 2>&1
+```
+
+Then apply the **Zero-Regression Rule**:
+
+1. Extract the list of `FAILED` / `ERROR` test node IDs from this run.
+2. Cross-reference with the `BASELINE` list:
+   - Test was **failing in baseline AND still failing** → pre-existing, acceptable — list in `notes`
+   - Test was **passing in baseline AND now failing** → **regression caused by this story** → add to `blockers`, TDD status MUST be `failed`
+   - Test was **not in baseline (new test)** and failing → your new test is broken → fix it
+3. **If any regression is found**: stop, fix the root cause in your implementation (do NOT delete or skip the regressing test), re-run the full suite, repeat until zero regressions.
+
+> ❌ **Absolute rule — zero new regressions**: TDD = `failed` if any test that was GREEN in the baseline is RED after your changes. "It was probably already failing" is not acceptable — the baseline is the proof, not an assumption.
+
+#### 5.1 Type-specific checks
+
+Run the relevant gates for the story type. Use commands from `agents_md`.
+
+- **Backend** — lint, type check. Integration tests must include success-path, error-case, and edge cases for every API endpoint (httpx.AsyncClient + ASGITransport)
+- **Frontend** — lint, type check, UI-INT (`npm run test:ui-int`) — ⚠️ MANDATORY for any frontend story
 - **DevOps / Infrastructure** — validate config syntax, verify images build
 - **Database (migration) — ⚠️ MANDATORY for any story with `database` in scope**:
   - Run `cd backend && source .venv/bin/activate && alembic upgrade head` on the DEV database (the real persistent SQLite file, NOT the ephemeral test DB)
@@ -171,7 +197,7 @@ General categories to cover:
 
 For `bugfix` and `security`: run the gates for the impacted stack.
 
-Fix all issues before moving to the next step.
+Fix all issues before moving to step 5bis.
 
 ### 5bis. Runtime Smoke Test (⚠️ MANDATORY for backend stories)
 

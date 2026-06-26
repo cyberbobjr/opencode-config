@@ -16,6 +16,21 @@ Thin orchestrator wrapper that assembles context, determines the correct mode, a
    - `AGENTS.md` — stack info (Identité table)
    - `.opencode/rules/commands.md` — test run commands, quality gate commands
    - `.opencode/rules/conventions.md` — design system reference (if `implementation_guide.scope` contains `frontend`)
+3. **Capture the test baseline** — run the full test suite NOW, before any code is written, and record which tests are currently failing:
+
+   **Backend** (always run even for frontend-only stories — shared fixtures can regress):
+   ```bash
+   cd backend && source .venv/bin/activate && pytest --tb=no -q 2>&1 | tail -30
+   ```
+   Capture: total passing, total failing, and the exact list of `FAILED` / `ERROR` test node IDs.
+
+   **Frontend** (if `implementation_guide.scope` contains `frontend`):
+   ```bash
+   npm --prefix frontend run test:unit -- --reporter=verbose 2>&1 | tail -20
+   ```
+   Capture: total passing, total failing, and the list of failing test names.
+
+   Save the output — it will be injected into the subagent as `BASELINE` so it can distinguish pre-existing failures from regressions it caused.
 
 ## Phase 2: Determine Mode
 
@@ -42,6 +57,49 @@ STORY JSON:
 
 PROJECT CONVENTIONS:
 [paste: stack info from AGENTS.md + test/quality gate commands from .opencode/rules/commands.md + design system ref from .opencode/rules/conventions.md if implementation_guide.scope contains "frontend"]
+
+BASELINE (captured before any implementation — used for regression detection):
+[paste the full output of the baseline test runs from Phase 1 — backend + frontend if applicable.
+ Include: total counts AND the exact FAILED/ERROR test node IDs.]
+
+[include if implementation_guide.files_create or files_modify contains workers/*.py:]
+CELERY TASK REGISTRATION:
+If the story creates or modifies a Celery task file (workers/*.py), add a test
+that validates every @celery_app.task is registered via workers/__init__.py.
+
+```python
+def test_task_registered():
+    from workers.celery_app import celery_app
+    assert "workers.mymodule.my_task" in celery_app.tasks
+```
+Without this, calling .delay() sends a message that the worker discards as
+"unregistered task" — silent data loss.
+
+[include if implementation_guide contains "api_contracts" or any endpoint definition:]
+INTEGRATION TESTS — FULL CHAIN VALIDATION:
+Every API endpoint that triggers a background operation or writes to the DB
+MUST have tests that validate the complete request→response chain through the
+real FastAPI router (httpx.AsyncClient + ASGITransport).
+
+For endpoints that dispatch Celery tasks:
+- Mock .delay() but verify the ARGUMENTS passed (not just "was called")
+- Add a test that verifies the mock's arguments match what the GET endpoint
+  expects (e.g., POST /run-pipeline passes the same run_id that GET reads)
+  ```python
+  # Bad — only checks dispatch happened:
+  mock_task.delay.assert_called_once()
+  
+  # Good — validates data coupling between POST and GET:
+  mock_task.delay.assert_called_once_with(source_id, run_id=ANY)
+  _, kwargs = mock_task.delay.call_args
+  run_id = kwargs.get("run_id")
+  # Then verify GET /pipeline-runs/{run_id} returns 200
+  ```
+
+For config/key/value validation:
+- Test BOTH dotted keys (``litellm.timeout``) AND top-level keys
+  (``feature_flags``) — the validation code path differs for each
+- Test round-trip: write → read back → verify structure preserved
 
 [only in fix-failing-acs mode — omit entirely otherwise:]
 FAILING ACS:
