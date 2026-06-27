@@ -305,6 +305,7 @@ def find_stories_dir() -> Path:
 
 
 STORIES_DIR = find_stories_dir()
+MOCKUPS_DIR = STORIES_DIR / "mockups"
 VERSION_FILE = STORIES_DIR.parent / ".kanban-version"
 SESSIONS_FILE = STORIES_DIR.parent / ".kanban-sessions.json"
 
@@ -634,6 +635,22 @@ def apply_update(story: dict, update: dict, default_actor: str = "dashboard") ->
     return story
 
 
+# ── Mockup helpers ──────────────────────────────────────────────────
+
+
+def _story_slug(story_id: str) -> str:
+    return story_id.lower().replace(" ", "-").replace(".", "-")
+
+
+def _next_mockup_version(story: dict) -> int:
+    existing = story.get("mockups", [])
+    return max((m.get("version", 0) for m in existing), default=0) + 1
+
+
+def _mockup_path(story_id: str, version: int) -> Path:
+    return MOCKUPS_DIR / _story_slug(story_id) / f"v{version}.html"
+
+
 # ── FastAPI REST ────────────────────────────────────────────────────
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
@@ -804,6 +821,76 @@ def api_sessions():
 def api_delete(sid: str):
     if not delete_one(sid):
         raise HTTPException(404, f"Story {sid} not found")
+    return {"ok": True}
+
+
+@rest.post("/api/stories/{sid}/mockups")
+def api_attach_mockup(sid: str, body: dict):
+    """Attach a mockup to a story.
+    Body: {source_path?: str, content?: str, description?: str}
+    Exactly one of source_path or content is required.
+    """
+    s = load_one(sid)
+    if not s:
+        raise HTTPException(404, f"Story {sid} not found")
+    source_path: str = body.get("source_path", "")
+    content: str = body.get("content", "")
+    description: str = body.get("description", "")
+    if not source_path and not content:
+        raise HTTPException(400, "source_path or content required")
+    version = _next_mockup_version(s)
+    dest = _mockup_path(sid, version)
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    if source_path:
+        src = Path(source_path)
+        if not src.exists():
+            raise HTTPException(400, f"File not found: {source_path}")
+        dest.write_bytes(src.read_bytes())
+    else:
+        dest.write_text(content, encoding="utf-8")
+    entry = {
+        "version": version,
+        "path": f"mockups/{_story_slug(sid)}/v{version}.html",
+        "created_at": datetime.now().isoformat(timespec="seconds"),
+        "description": description,
+    }
+    s.setdefault("mockups", []).append(entry)
+    save_one(sid, s)
+    return entry
+
+
+@rest.get("/api/stories/{sid}/mockups")
+def api_list_mockups(sid: str):
+    """List all mockups attached to a story."""
+    s = load_one(sid)
+    if not s:
+        raise HTTPException(404, f"Story {sid} not found")
+    return s.get("mockups", [])
+
+
+@rest.get("/api/stories/{sid}/mockups/{version}")
+def api_get_mockup(sid: str, version: int):
+    """Serve the HTML of a specific mockup version."""
+    s = load_one(sid)
+    if not s:
+        raise HTTPException(404, f"Story {sid} not found")
+    path = _mockup_path(sid, version)
+    if not path.exists():
+        raise HTTPException(404, f"Mockup v{version} not found for {sid}")
+    return HTMLResponse(path.read_text(encoding="utf-8"))
+
+
+@rest.delete("/api/stories/{sid}/mockups/{version}")
+def api_delete_mockup(sid: str, version: int):
+    """Delete a mockup (file + reference in story JSON)."""
+    s = load_one(sid)
+    if not s:
+        raise HTTPException(404, f"Story {sid} not found")
+    path = _mockup_path(sid, version)
+    if path.exists():
+        path.unlink()
+    s["mockups"] = [m for m in s.get("mockups", []) if m.get("version") != version]
+    save_one(sid, s)
     return {"ok": True}
 
 
@@ -1065,6 +1152,49 @@ def create_story(title: str, phase: int = 7) -> str:
     save_one(sid, story)
     _mcp_debug("create_story", "out", id=sid, phase=phase)
     return json.dumps(story, ensure_ascii=False)
+
+
+@mcp.tool()
+def attach_mockup(story_id: str, description: str = "", source_path: str = "", content: str = "") -> str:
+    """Attach an HTML mockup to a story (typically during the refine phase).
+
+    Pass exactly one of:
+    - source_path: absolute path to an existing HTML file (e.g. /tmp/mockup.html)
+    - content: raw HTML string to store directly
+
+    The file is saved under user-stories/mockups/{story-slug}/v{N}.html and a
+    reference is added to the story's `mockups` list.
+    Returns JSON {"mockup": {...entry...}, "story": {...}}.
+    """
+    _mcp_debug("attach_mockup", "in", story_id=story_id,
+               source=source_path or "(inline content)", description=description)
+    s = load_one(story_id)
+    if not s:
+        _mcp_debug("attach_mockup", "out", error="not found")
+        return json.dumps({"error": f"Story {story_id} not found"})
+    if not source_path and not content:
+        return json.dumps({"error": "source_path or content required"})
+    version = _next_mockup_version(s)
+    dest = _mockup_path(story_id, version)
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    if source_path:
+        src = Path(source_path)
+        if not src.exists():
+            _mcp_debug("attach_mockup", "out", error=f"file not found: {source_path}")
+            return json.dumps({"error": f"File not found: {source_path}"})
+        dest.write_bytes(src.read_bytes())
+    else:
+        dest.write_text(content, encoding="utf-8")
+    entry = {
+        "version": version,
+        "path": f"mockups/{_story_slug(story_id)}/v{version}.html",
+        "created_at": datetime.now().isoformat(timespec="seconds"),
+        "description": description,
+    }
+    s.setdefault("mockups", []).append(entry)
+    save_one(story_id, s)
+    _mcp_debug("attach_mockup", "out", version=version, path=entry["path"])
+    return json.dumps({"mockup": entry, "story": s}, ensure_ascii=False)
 
 
 @mcp.tool()
