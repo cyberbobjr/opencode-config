@@ -152,6 +152,13 @@ kanban-update-story("$ARGUMENTS", '{"agent_status": "awaiting_input"}')
 - **Use `.placeholder` divs for list content** — don't invent real content
 - **No external dependencies** — fully self-contained, no CDN, no JS
 
+> ⚠️ **Ce wireframe est une maquette grise — il ne représente PAS le code à écrire.**
+> Les classes `.btn`, `.field`, `.card` et les éléments `<div>` sont des représentations visuelles uniquement.
+> Le TDD agent qui implémentera cette story doit utiliser **exclusivement les composants Storybook**
+> (`<Button>`, `<Input>`, `<Select>`, `<Textbox>`, etc.) — les éléments HTML natifs (`<button>`, `<input>`,
+> `<select>`, `<textarea>`) sont **interdits** dans tout `.vue` hors de `components/ui/`.
+> Ce wireframe communique le **layout et les intentions UX**, pas la stack technique.
+
 ---
 
 Ask **4 to 6 questions** (up to 8 for complex stories). Each question uses the OpenCode `question` tool.

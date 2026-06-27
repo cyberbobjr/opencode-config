@@ -70,6 +70,20 @@ BASELINE (captured before any implementation — used for regression detection):
 [paste the full output of the baseline test runs from Phase 1 — backend + frontend if applicable.
  Include: total counts AND the exact FAILED/ERROR test node IDs.]
 
+[include only if implementation_guide.mockup_ref is set AND scope contains "frontend":]
+WIREFRAME REFERENCE — READ LAYOUT ONLY, DO NOT COPY CODE:
+A wireframe was generated during refinement: [paste implementation_guide.mockup_ref]
+⚠️ The wireframe HTML uses gray-box placeholder classes (.btn, .field, .card) and raw
+HTML elements (<div>, <button>, <input>) that are FORBIDDEN in real .vue files.
+Use the wireframe ONLY to understand layout intent, component positioning, and UX flow.
+For implementation, use exclusively the Storybook components from the catalog:
+  <Button> instead of <button> / <div class="btn">
+  <Input>  instead of <input>  / <div class="field">
+  <Select> instead of <select>
+  <Textbox> instead of <textarea>
+If a needed UI element has no Storybook equivalent → create a backlog story for it,
+use the closest existing component as a fallback, and NEVER use raw HTML elements.
+
 [include if implementation_guide.files_create or files_modify contains workers/*.py:]
 CELERY TASK REGISTRATION:
 If the story creates or modifies a Celery task file (workers/*.py), add a test
