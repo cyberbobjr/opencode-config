@@ -28,6 +28,43 @@ Before any question:
 4. Call `kanban-list-stories` with the same `phase` — read adjacent stories to detect cross-pollination opportunities
 5. Check available backend routes — use the API spec command defined in `AGENTS.md` or `.opencode/rules/commands.md`. If a required route is missing or unexposed, include its creation as part of this story rather than adding a conflicting endpoint later.
 
+**Opportunistic SOLID detection during existing code analysis:**
+
+For each file inspected, identify SOLID violations (direct DB instantiation in a service,
+business logic in a route, external client without a wrapper, etc.).
+
+**If the violation is in a file already in this story's `files_modify`:**
+→ Integrate the refactoring directly. Annotate `"change": "feature X + SOLID refacto: [pattern]"`.
+
+**If the violation is in a file OUTSIDE this story's scope:**
+
+1. First check if a `[REFACTO SOLID]` story covering this module already exists:
+   ```
+   kanban-list-stories → filter by title containing "[REFACTO SOLID]" + module concerned
+   ```
+
+2a. **Existing story found** → enrich its description via `kanban-update-story`:
+    add the file and violation identified. Do not create a duplicate.
+
+2b. **No existing story** → create a new story:
+    ```
+    kanban-create-story({
+      "title": "[REFACTO SOLID] <Layer or module> — <main violation>",
+      "description": "## Context\nSOLID violation identified during refine of [story_id].\n\n## Files concerned\n- `[path/file.py]`: [violation description]\n\n## Target refactoring\n[SOLID pattern to apply: session injection, service extraction, etc.]",
+      "type": "architecture",
+      "stack": ["backend"],
+      "priority": "low"
+    })
+    ```
+
+**Granularity rule:** Group violations by application layer, not by file.
+- ✅ `[REFACTO SOLID] Routes layer — session injection` (covers N routes)
+- ❌ `[REFACTO SOLID] app/routes/sources.py` + `[REFACTO SOLID] app/routes/briefings.py`
+  (too atomic, pollutes the backlog)
+
+⚠️ Never widen the current story's `files_modify` to pull in a refactoring
+of files unrelated to the feature — scope must stay coherent.
+
 ---
 
 ## Step 2 — Question Cycle (MANDATORY)
@@ -95,7 +132,7 @@ kanban-update-story("$ARGUMENTS", '{"agent_status": "awaiting_input"}')
    ```
 
 3. Reference it at the start of **Q1**:
-   > *"J'ai ouvert une maquette dans ton navigateur (`wireframe-$ARGUMENTS.html`). Elle représente ma lecture initiale de l'écran : [description courte du layout]. Ma première question porte sur..."*
+    > *"I've opened a wireframe in your browser (`wireframe-$ARGUMENTS.html`). It represents my initial interpretation of the screen: [short layout description]. My first question is about..."*
 
 **Rules for the HTML:**
 - **Gray-box only** — no brand colors, no icons — every interactive element must be a labeled text box
@@ -112,7 +149,7 @@ Ask **4 to 6 questions** (up to 8 for complex stories). Each question uses the O
 |----------|-----------|---------------------|-----------------|
 | 1 | **Product Owner** | Business value, hidden needs | What adjacent feature could multiply value for the user? |
 | 2 | **Architect** | Technical consistency, patterns | What emerging pattern would improve overall consistency? |
-| 3 | **Developer** | Edge cases, implementation clarity, tests | What edge case could become a reusable utility? |
+| 3 | **Developer** | Edge cases, implementation clarity, tests, test placement (unit vs integration) | What edge case could become a reusable utility? Identify if the logic is pure (→ `tests/unit/`) or coupled to HTTP/DB (→ `tests/integration/`). If both, propose a decoupling to make business logic unit-testable. |
 | 4 | **DevSecOps** | Attack surfaces, countermeasures | What uncovered threat deserves a dedicated protection feature? |
 | 5 | **Product Owner** | Functional gaps, unexpressed needs | What need from adjacent stories should be addressed here? |
 | 6 | **Architect** | Dependencies, integration, scalability | What cross-cutting optimization (cache, batch, streaming) could be anticipated? |
@@ -139,6 +176,16 @@ Once all questions are answered:
 4. **Readiness check**:
    - ✅ **Ready** → continue to Step 4
    - ⚠️ **Blockers** → list what is blocking, propose a path forward; do NOT advance until resolved
+
+**AC Quality Gate — 3 non-negotiable rules before persisting:**
+
+| Rule | Question to ask | ❌ Anti-pattern | ✅ Valid pattern |
+|-------|---------------------|----------------|-----------------|
+| **Behavioral** | Does the AC describe what the system *does* (observable results) and not *how*? | `_validate_fields() rejects category "astrology"` | `Submitting a source with an unknown category returns 422` |
+| **Black-Box** | Can the AC be validated without knowing the internal architecture, function names, or hidden state? | `ALLOWED_CATEGORIES contains exactly 15 entries` | `Any category outside the official list is rejected on submission` |
+| **Business Validation** | Does the AC guarantee a user need or a global contract, independently of technology? | `celery_app.conf.task_acks_late is True` | `A failed message is automatically retransmitted without loss` |
+
+If an AC fails any of these 3 rules → rewrite it before moving forward.
 
 ---
 
@@ -167,7 +214,10 @@ Identify the **story type** then write the adapted plan. Write **only the releva
 - Data model: new fields, migration needed (yes/no)
 - API contracts: `METHOD /path` — auth required — request schema — response schema — error codes
 - Background workers: task name, queue, retry policy if applicable
-- Implementation sequence: model → service → route → tests
+  - Implementation sequence: model → service (session injected as parameter)
+              → route (≤ 10 lines, Depends())
+              → tests/unit/ (pure logic, mocks)
+              → tests/integration/ (HTTP endpoints)
 - **Integration tests — ⚠️ MANDATORY** — every new API endpoint must include:
   - Minimum 1 happy-path integration test (expected 2xx)
   - Minimum 1 error-case test (invalid input → 4xx)
@@ -234,6 +284,13 @@ Identify the **story type** then write the adapted plan. Write **only the releva
   - Verify `celery_cli.py` and `docker-compose.yml` worker startup commands consume every declared queue via the `-Q` flag
   - If a new queue is introduced, verify no other task module was already using it to avoid unintended cross-consumption
 - Constraints: imposed patterns, what NOT to do, performance thresholds
+- **SOLID (new code only — no retroactive rewrite)**:
+  If the story creates a new service or modifies an existing one:
+  - Inject the DB session as a parameter (no `get_async_session_factory()()`
+    in the service body)
+  - Define an explicit interface if the component will be mocked in a unit test
+  - Consume shared clients (Firecrawl, LLM, Redis, Neo4j) via
+    `app/services/*.py` — never directly in routes or workers
 - 🔁 **Cross-cutting services check**: If the story uses a shared infrastructure client (Firecrawl, LLM, DB, Redis, Neo4j, email), verify it is consumed through a **dedicated service wrapper** (`app/services/*.py`), not via ad-hoc instantiation. Cross-reference existing consumers with `grep` to detect inconsistent patterns before writing code. If 2+ modules instantiate the same client independently, create/extend a shared service in this story.
 
 ---
@@ -281,11 +338,11 @@ kanban-update-story("$ARGUMENTS", '{
       "2. Second step"
     ],
     "test_strategy": {
-      "unit": "What to unit-test and with which tool — or null if not applicable",
-      "integration": "Which endpoints/services to integration-test — tool, auth fixture approach, minimum cases",
-      "e2e": "Which user flows to cover with Playwright — nominal + boundary cases, mocked routes — or null if not applicable",
+      "unit": "tests/unit/test_<module>.py — pytestmark = pytest.mark.unit — pure functions, 0 I/O, mocks for external dependencies. Test: [what deserves a unit test]",
+      "integration": "tests/integration/test_<feature>_api.py — pytestmark = pytest.mark.integration — httpx.AsyncClient + ASGITransport + real test SQLite DB. Minimum: 1 success + 1 4xx error + edge cases",
+      "e2e": "frontend/src/<feature>.ui-int.ts — Playwright + page.route() — or null if no frontend",
       "coverage_target": 80,
-      "critical_cases": ["Edge case 1 that must not regress", "Edge case 2"]
+      "critical_cases": ["Edge case 1 that must never regress", "Edge case 2"]
     },
     "constraints": "What not to do, imposed patterns, performance thresholds"
   }
@@ -301,6 +358,12 @@ kanban-update-story("$ARGUMENTS", '{
 - [ ] `test_strategy` has content in every relevant field — not a generic sentence
 - [ ] `critical_cases` lists at least the edge cases identified during the dialogue
 - [ ] Every AC is a testable assertion — no "user can..." phrasing
+- [ ] No AC references an internal function name, constant, private class,
+      or implementation detail
+- [ ] Every AC can be validated black-box via the HTTP API or user interface
+      — without access to source code
+- [ ] The underlying business need is identifiable by reading the AC without
+      technical knowledge of the project
 - [ ] `approach` is specific enough that two developers would implement it the same way
 - [ ] If new Celery queues are declared → `celery_cli.py` and `docker-compose.yml` worker commands include them in `-Q`
 

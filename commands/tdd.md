@@ -20,7 +20,7 @@ Thin orchestrator wrapper that assembles context, determines the correct mode, a
 
    **Backend** (always run even for frontend-only stories — shared fixtures can regress):
    ```bash
-   cd backend && source .venv/bin/activate && pytest --tb=no -q 2>&1 | tail -30
+    cd backend && uv run pytest tests/unit/ tests/integration/ --tb=no -q 2>&1 | tail -30
    ```
    Capture: total passing, total failing, and the exact list of `FAILED` / `ERROR` test node IDs.
 
@@ -58,6 +58,14 @@ STORY JSON:
 PROJECT CONVENTIONS:
 [paste: stack info from AGENTS.md + test/quality gate commands from .opencode/rules/commands.md + design system ref from .opencode/rules/conventions.md if implementation_guide.scope contains "frontend"]
 
+TEST STRUCTURE:
+- tests/unit/        → pytestmark = pytest.mark.unit    — 0 I/O, pure logic, mocks
+- tests/integration/ → pytestmark = pytest.mark.integration — AsyncClient + real test SQLite DB
+- Every new test file MUST be placed in one of these two directories
+- Unit test command      : uv run pytest tests/unit/ -m unit -q
+- Integration test command: uv run pytest tests/integration/ -m integration -q
+- Full test command      : uv run pytest tests/unit/ tests/integration/ -q
+
 BASELINE (captured before any implementation — used for regression detection):
 [paste the full output of the baseline test runs from Phase 1 — backend + frontend if applicable.
  Include: total counts AND the exact FAILED/ERROR test node IDs.]
@@ -68,6 +76,8 @@ If the story creates or modifies a Celery task file (workers/*.py), add a test
 that validates every @celery_app.task is registered via workers/__init__.py.
 
 ```python
+# Place this test in tests/integration/test_<module>_task.py
+# (marker: pytestmark = pytest.mark.integration)
 def test_task_registered():
     from workers.celery_app import celery_app
     assert "workers.mymodule.my_task" in celery_app.tasks

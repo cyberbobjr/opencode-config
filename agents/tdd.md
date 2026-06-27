@@ -34,7 +34,7 @@ At the end, return this structured report:
 **status**: passed | failed
 **tests**: N created, N passed, N failed | **coverage**: XX%
 **test_types**: unit, integration, ui-int
-**files_created**: tests/test_auth.py, ...
+**files_created**: tests/unit/test_config.py, tests/integration/test_auth_api.py, ...
 **files_modified**: app/auth.py, ...
 **acs_covered**: AC1 — description, AC2 — description
 **blockers**: (empty if none)
@@ -87,6 +87,41 @@ You must also update the story via the Kanban MCP tools throughout execution (se
 
 ### 2. RED — Write the failing tests
 
+**Before writing a test, validate that the corresponding AC respects the 3 rules:**
+
+1. **Behavioral** — the test validates an observable result (HTTP response, DB state after
+   action, UI rendering), not an internal mechanism
+2. **Black-Box** — the test ignores internal architecture: private function names,
+   constants, Celery attributes, Pydantic structure
+3. **Business Validation** — the test guarantees the end-user need, regardless of
+   the underlying technology
+
+If an AC violates any of these rules → do not implement it as-is. Signal in
+`blockers`: `"AC N violates the [Behavioral|Black-Box|Business Validation] rule
+— reformulation required"`. Do not invent a reformulation without validation.
+
+**Contract design before the first unit test:**
+
+1. Define the inputs, output, and injected dependencies of the component
+2. Verify that each dependency can be replaced by a mock without changing the signature
+3. If not possible → the component is poorly decoupled → revise the design before coding
+
+Quick detection rule:
+
+```python
+# ❌ Not testable in isolation — hidden dependency on DB
+async def qualify_source(url: str) -> dict:
+    async with get_async_session_factory()() as session:  # internal creation = non-injectable
+        ...
+
+# ✅ Unit-testable — declared dependency = injectable, mockable
+async def qualify_source(url: str, session: AsyncSession) -> dict:
+    ...
+```
+
+If you find yourself patching `get_async_session_factory` in a unit test:
+stop — refactor the component design first.
+
 Adapt the test type to the story domain:
 
 | Story type | Test type | Tool |
@@ -103,6 +138,16 @@ Adapt the test type to the story domain:
 | `security` | Abuse / penetration test | per stack |
 | `docs` | No RED/GREEN test | manual verification |
 
+**Test file routing — mandatory:**
+
+| Test type | Target directory | Marker | Rule |
+|-----------|-----------------|--------|-------|
+| Unit (pure logic, mocks) | `tests/unit/test_<module>.py` | `pytestmark = pytest.mark.unit` | 0 I/O — no DB, no HTTP, no file I/O |
+| Integration (API, DB) | `tests/integration/test_<feature>_api.py` | `pytestmark = pytest.mark.integration` | `AsyncClient` + real test SQLite DB |
+| UI-INT (Playwright) | `frontend/src/<feature>.ui-int.ts` | — | `page.route()` to mock all API calls |
+
+Add `pytestmark` at the top of every new test file — never optional.
+
 General rules:
 - Write the test **before** the production code — it must fail (`red`)
 - One test per scenario (nominal + edge cases)
@@ -118,6 +163,27 @@ If the story creates or modifies a backend endpoint:
 4. Mock Celery `.delay()` calls if the endpoint kicks background tasks — prevents external service calls during testing
 5. Naming: `test_<endpoint>_<scenario>` (e.g. `test_submit_source_success`, `test_submit_source_unauthenticated`)
 
+**Anti-patterns to systematically reject:**
+
+```python
+# ❌ Tests Pydantic, not business logic
+assert settings.app_name == "NewsCap"       # constructor tautology
+
+# ❌ Tests an internal constant, not a behavior
+assert len(ALLOWED_CATEGORIES) == 15        # white-box
+
+# ❌ Mock-only with no behavioral assertion
+mock_task.delay.assert_called_once()        # proves nothing about the result
+
+# ✅ Behavioral: the endpoint rejects, the client gets 422
+resp = await client.post("/api/sources", json={"category": "astrology"})
+assert resp.status_code == 422
+
+# ✅ Black-box: the HTTP contract is respected, not the internal implementation
+resp = await client.get("/api/sources/999")
+assert resp.status_code == 404
+```
+
 **Playwright UI-INT tests — MANDATORY for all frontend stories**:
 If `has_ui_int = true` (step 1.7):
 1. Create at minimum one Playwright test file per feature: `src/<feature>.ui-int.ts`
@@ -130,7 +196,7 @@ If `has_ui_int = true` (step 1.7):
    })
    ```
 3. Use `page.route()` to intercept and mock ALL API calls the page makes — no real backend needed
-4. **Tests aux bornes obligatoires** : au moins un test nominal (succès) + un test d'erreur (timeout, 4xx, 5xx, données vides)
+4. **Mandatory boundary tests**: at least one nominal test (success) + one error test (timeout, 4xx, 5xx, empty data)
 5. Run with `npm run test:ui-int` (must fail at RED stage)
 6. File naming convention: `*.ui-int.ts` (auto-discovered by playwright.config.ts)
 
@@ -143,6 +209,59 @@ Write just enough to make the tests pass:
 - Follow project conventions (naming, structure, patterns from agents_md)
 - Follow the `implementation_guide.steps` sequence if available
 
+**SOLID checklist by type — new code only:**
+
+#### Route handler (FastAPI)
+- Body ≤ 10 lines — no business logic
+- Receives the service via `Depends()`, delegates, returns
+- No SQLAlchemy imports, no direct `session.execute()`
+
+```python
+# ❌ Business logic in the route
+@router.post("/sources")
+async def submit(data: SourceIn, session: AsyncSession = Depends(get_db)):
+    existing = await session.execute(select(Source).where(Source.url == data.url))
+    if existing.scalar_one_or_none():
+        raise HTTPException(409)
+    source = Source(**data.model_dump())
+    session.add(source)
+    await session.commit()
+    return source
+
+# ✅ Route delegates to service
+@router.post("/sources")
+async def submit(data: SourceIn, svc: SourceService = Depends(get_source_service)):
+    return await svc.submit(data)
+```
+
+#### Service (`app/services/*.py`)
+- Receives the session as a parameter — never instantiates it
+- Single responsibility: one business capability per service
+- No `fastapi` imports, no `HTTPException` (raise custom business exceptions)
+- External clients (Firecrawl, LLM, Redis) go through a wrapper `app/services/*.py`
+
+```python
+# ❌ Session instantiated in the service
+class SourceService:
+    async def submit(self, data: SourceIn):
+        async with get_async_session_factory()() as session:
+            ...
+
+# ✅ Session injected
+class SourceService:
+    def __init__(self, session: AsyncSession):
+        self._session = session
+
+    async def submit(self, data: SourceIn) -> Source:
+        ...
+```
+
+#### Repository (`app/repositories/*.py`)
+- Encapsulates all SQL queries for an entity
+- Receives the session as a parameter
+- Returns domain objects, not raw SQLAlchemy `Row` objects
+- No business logic (no rules, no transformations)
+
 ---
 
 ### 4. REFACTOR — Clean up without breaking
@@ -151,6 +270,17 @@ Once tests are green:
 - Refactor if needed — remove duplication, improve readability
 - Do not change observable behavior — tests must still pass
 - For `architecture` / `refactoring`: this is the main step — verify that zero existing tests regress
+
+**SOLID audit — verify before moving to Quality Gates:**
+
+- [ ] No `get_async_session_factory()()` in `app/services/` or `app/routes/` outside `Depends()`
+- [ ] No `session.execute()` / `session.add()` / `session.commit()` in `app/routes/`
+- [ ] Each route handler is ≤ 10 lines
+- [ ] No `import fastapi` in `app/services/`
+- [ ] Every component with a unit test can be instantiated with mocks only
+      (no real I/O)
+
+If any point fails → refactor now, before the quality gates.
 
 ---
 
@@ -162,7 +292,7 @@ Before any type-specific check, run the **complete** test suite and compare agai
 
 **Backend:**
 ```bash
-cd backend && source .venv/bin/activate && pytest --tb=short -q 2>&1
+cd backend && uv run pytest tests/unit/ tests/integration/ --tb=short -q 2>&1
 ```
 
 **Frontend** (if `frontend` in scope):
@@ -186,6 +316,31 @@ Then apply the **Zero-Regression Rule**:
 Run the relevant gates for the story type. Use commands from `agents_md`.
 
 - **Backend** — lint, type check. Integration tests must include success-path, error-case, and edge cases for every API endpoint (httpx.AsyncClient + ASGITransport)
+
+  **Backend — SOLID verification (mandatory if the story creates or modifies a service or route):**
+
+  ```bash
+  # Direct DB instantiation in services or routes (outside Depends)
+  grep -rn "get_async_session_factory\(\)()\|create_engine\|AsyncSession()" \
+    backend/app/services/ backend/app/routes/ \
+    | grep -v "Depends\|conftest\|test_"
+  # Expected: 0 results
+
+  # DB logic in routes
+  grep -rn "session\.execute\|session\.add\|session\.commit\|session\.delete" \
+    backend/app/routes/
+  # Expected: 0 results
+
+  # External client instantiated directly outside services/
+  grep -rn "FirecrawlApp()\|litellm\.\|redis\.asyncio\.from_url\|AsyncDriver" \
+    backend/app/routes/ backend/workers/ \
+    | grep -v "app/services/\|conftest\|test_"
+  # Expected: 0 results
+  ```
+
+  If any of these greps returns results → **TDD status MUST be `failed`**.
+  SOLID on new code is not optional.
+
 - **Frontend** — lint, type check, UI-INT (`npm run test:ui-int`) — ⚠️ MANDATORY for any frontend story
 - **DevOps / Infrastructure** — validate config syntax, verify images build
 - **Database (migration) — ⚠️ MANDATORY for any story with `database` in scope**:
@@ -219,9 +374,12 @@ If the story creates or modifies a backend endpoint:
    - Files created and files modified (paths, what was added or changed)
    - Key implementation choices (e.g. "chose service layer pattern", "added load_dotenv before Settings()")
    - Test types used (unit, integration, UI-INT) and what scenarios they cover
-   - Any edge cases left uncovered or caveats
+    - Any edge cases left uncovered or caveats
+    - If an AC was found non-compliant with the behavioral / black-box / business
+      rules: mention it in `blockers` with the suggested reformulation. Never silently
+      validate a poor-quality AC.
 
-   Keep it to 3–6 lines — enough for a reviewer to understand what was built without reading the diff.
+    Keep it to 3–6 lines — enough for a reviewer to understand what was built without reading the diff.
 
 2. Mark `tdd.status = passed` (or `failed`) via:
    ```

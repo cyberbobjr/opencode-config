@@ -36,6 +36,15 @@ PROJECT CONVENTIONS:
 
 Instructions:
 - Validate all acceptance criteria using the test type appropriate to each AC (unit / integration / UI-INT)
+- Run tests with:
+  `cd backend && uv run pytest tests/unit/ tests/integration/ --tb=short -q`
+- Unit tests are in `tests/unit/` (marker: `unit`),
+  integration tests in `tests/integration/` (marker: `integration`)
+- For each AC, verify that the validation test is **behavioral**
+  (observable result, not internal state) and **black-box** (no reference
+  to a private function, constant, or implementation attribute). If an existing
+  test violates these rules, signal it in `failures` with the diagnosis
+  `"non-behavioral test: [reason]"` — even if the test passes.
 - Update the story status via MCP tools (kanban-update-story) as you progress
 - At the end, return the structured QA report
 ```

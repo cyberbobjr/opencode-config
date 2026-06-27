@@ -6,14 +6,6 @@
       "type": "local",
       "command": ["python", ".opencode/kanban/server.py", "--mcp","--debug"],
       "enabled": true
-    },
-    "figma": {
-      "type": "local",
-      "command": ["npx", "-y", "figma-mcp"],
-      "enabled": true,
-      "environment": {
-        "FIGMA_API_KEY": "{env:FIGMA_API_KEY}"
-      }
     }
   }
 }
