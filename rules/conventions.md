@@ -87,12 +87,41 @@ Un build Storybook en échec **bloque** le passage en `commit_ready`.
 
 ### Catalogue Storybook disponible
 
-| Élément natif | Composant Storybook |
-|---------------|-------------------|
-| `<input>` | `<Input>` |
-| `<select>` | `<Select>` |
-| `<button>` | `<Button>` |
-| `<textarea>` | `<Textbox>` |
+#### Primitives (atoms) — `components/ui/`
+
+| Usage | Composant | Props clés |
+|-------|-----------|-----------|
+| Champ texte | `<Input>` | `v-model`, `type`, `error`, `disabled` |
+| Liste déroulante | `<Select>` | `v-model`, `options`, `error` |
+| Bouton | `<Button>` | `variant` (primary/secondary/ghost/danger), `size` (s/m/l), `loading`, `label` |
+| Zone de texte | `<Textarea>` | `v-model`, `rows`, `error` |
+| Mot de passe | `<PasswordField>` | `v-model`, `label`, `error`, `show-strength-indicator` |
+| Cases à cocher | `<CheckboxGroup>` | `v-model`, `options` |
+| Boutons radio | `<RadioGroup>` | `v-model`, `options` |
+| Interrupteur | `<ToggleSwitch>` | `v-model`, `label` |
+| Pastille statut | `<Badge>` | `variant` (success/error/warning/info/neutral), `label` |
+| Étiquette | `<Tag>` | `label`, `removable` |
+| Carte | `<Card>` | slot default, `padding` |
+| Icône | `<Icon>` | `name`, `size` |
+| Chargement inline | `<Spinner>` | `size` |
+| Squelette chargement | `<Skeleton>` | `width`, `height`, `rounded` |
+| Barre progression | `<ProgressBar>` | `value` (0-100), `color` |
+| Notification flottante | `<Toast>` | `variant`, `message`, `duration` |
+| Conteneur toasts | `<Toaster>` | (singleton, pas de props) |
+
+#### Molécules (à créer — US backlog)
+
+| Usage | Composant | US |
+|-------|-----------|-----|
+| Bannière erreur/succès/warning | `<Alert>` | US 7.55 |
+| Fil d'Ariane | `<Breadcrumb>` | US 7.56 |
+| Champ avec label + erreur | `<FormField>` | US 7.57 |
+| Navigation par onglets | `<Tabs>` | US 7.58 |
+| État vide | `<EmptyState>` | US 7.59 |
+
+> ⚠️ Les éléments HTML natifs `<input>`, `<select>`, `<button>`, `<textarea>` sont **interdits**
+> dans tout `.vue` hors de `components/ui/`. Les molécules ci-dessus sont également interdites
+> tant que leur US n'est pas terminée — utiliser le composant primitif le plus proche en attendant.
 
 ### Composants manquants — Process
 
@@ -100,9 +129,9 @@ Si vous avez besoin d'un élément d'interface qui n'a pas d'équivalent Storybo
 
 1. **Ne pas utiliser de HTML natif** — la règle ESLint le bloque
 2. **Créer une US** dans le Backlog pour le composant manquant (`US X.Y — Créer composant <Nom>`)
-3. **Utiliser un composant existant** qui s'en approche le plus (ex: `<Textbox>` pour un textarea sophistiqué)
+3. **Utiliser un composant existant** qui s'en approche le plus en attendant
 4. La nouvelle US doit inclure : `*.vue`, `*.stories.ts`, `__tests__/*.test.ts`, et `*.ui-int.ts` si applicable
-5. Une fois le catalogue complété, toute migration de page existante peut utiliser le nouveau composant
+5. Une fois l'US terminée, migrer les usages existants vers le nouveau composant
 
 ### Quality Gates
 
