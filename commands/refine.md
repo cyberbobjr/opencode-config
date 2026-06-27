@@ -131,8 +131,19 @@ kanban-update-story("$ARGUMENTS", '{"agent_status": "awaiting_input"}')
    open /tmp/wireframe-$ARGUMENTS.html
    ```
 
-3. Reference it at the start of **Q1**:
-    > *"I've opened a wireframe in your browser (`wireframe-$ARGUMENTS.html`). It represents my initial interpretation of the screen: [short layout description]. My first question is about..."*
+3. **Attach the wireframe to the story** immediately after opening it:
+   ```
+   kanban-attach-mockup("$ARGUMENTS",
+     source_path="/tmp/wireframe-$ARGUMENTS.html",
+     description="Wireframe initial — [one-line layout description]")
+   ```
+   The tool returns `{"mockup": {"version": N, "path": "mockups/...", ...}}`.
+   Note the version number — it will be used in the Q1 reference and in Step 5.
+
+4. Reference it at the start of **Q1**:
+    > *"I've opened a wireframe in your browser (`wireframe-$ARGUMENTS.html`) and attached it to the story (v{N} — viewable at `/api/stories/$ARGUMENTS/mockups/{N}`). It represents my initial interpretation of the screen: [short layout description]. My first question is about..."*
+
+**If the wireframe is revised during the dialogue** (e.g., after Q1 answers reveal a different layout), regenerate the HTML, overwrite the file, reopen it, and call `kanban-attach-mockup` again — a new version (`v{N+1}`) is created automatically.
 
 **Rules for the HTML:**
 - **Gray-box only** — no brand colors, no icons — every interactive element must be a labeled text box
@@ -344,7 +355,8 @@ kanban-update-story("$ARGUMENTS", '{
       "coverage_target": 80,
       "critical_cases": ["Edge case 1 that must never regress", "Edge case 2"]
     },
-    "constraints": "What not to do, imposed patterns, performance thresholds"
+    "constraints": "What not to do, imposed patterns, performance thresholds",
+    "mockup_ref": "v1 — /api/stories/$ARGUMENTS/mockups/1 (or null if no wireframe was generated)"
   }
 }')
 ```
@@ -366,6 +378,7 @@ kanban-update-story("$ARGUMENTS", '{
       technical knowledge of the project
 - [ ] `approach` is specific enough that two developers would implement it the same way
 - [ ] If new Celery queues are declared → `celery_cli.py` and `docker-compose.yml` worker commands include them in `-Q`
+- [ ] If the story type is `frontend` or `fullstack` → a wireframe was generated, attached via `kanban-attach-mockup`, and `implementation_guide.mockup_ref` is set
 
 If any item fails: revise before advancing.
 
