@@ -72,6 +72,10 @@ Confirm? [y/n]
 If user confirms:
 - `git commit -m "<message>"` on the current branch
 - Display the commit hash
+- If the argument looks like a story ID (format `us-X-Y`), move the kanban card to `completed` using the MCP tool:
+  ```
+  move_story(story_id="<story-id>", new_status="completed", actor="commit")
+  ```
 
 If user declines, ask if they want to edit the message or cancel.
 
