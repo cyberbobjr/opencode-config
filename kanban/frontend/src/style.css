@@ -3,25 +3,25 @@
 @tailwind utilities;
 
 /* Markdown content inside MarkdownContent.vue */
-.md :deep(h1) { @apply text-xl font-bold text-slate-100 mt-3 mb-1.5; }
-.md :deep(h2) { @apply text-lg font-semibold text-slate-200 mt-2.5 mb-1; }
-.md :deep(h3) { @apply text-base font-semibold text-slate-300 mt-2 mb-1; }
-.md :deep(p)  { @apply text-slate-300 mb-2 leading-relaxed; }
-.md :deep(ul) { @apply list-disc pl-5 text-slate-300 mb-2 space-y-0.5; }
-.md :deep(ol) { @apply list-decimal pl-5 text-slate-300 mb-2 space-y-0.5; }
-.md :deep(li) { @apply text-slate-300; }
-.md :deep(code) { @apply bg-slate-700 text-emerald-400 px-1.5 py-0.5 rounded text-sm font-mono; }
-.md :deep(pre)  { @apply bg-slate-900 rounded-lg p-3 mb-2 overflow-x-auto; }
-.md :deep(pre code) { @apply bg-transparent p-0 text-emerald-300; }
-.md :deep(blockquote) { @apply border-l-2 border-slate-600 pl-3 italic text-slate-400 mb-2; }
-.md :deep(strong) { @apply font-semibold text-slate-200; }
-.md :deep(em)     { @apply italic text-slate-300; }
-.md :deep(a)      { @apply text-blue-400 underline hover:text-blue-300; }
+.md h1 { @apply text-xl font-bold text-slate-100 mt-3 mb-1.5; }
+.md h2 { @apply text-lg font-semibold text-slate-200 mt-2.5 mb-1; }
+.md h3 { @apply text-base font-semibold text-slate-300 mt-2 mb-1; }
+.md p  { @apply text-slate-300 mb-2 leading-relaxed; }
+.md ul { @apply list-disc pl-5 text-slate-300 mb-2 space-y-0.5; }
+.md ol { @apply list-decimal pl-5 text-slate-300 mb-2 space-y-0.5; }
+.md li { @apply text-slate-300; }
+.md code { @apply bg-slate-700 text-emerald-400 px-1.5 py-0.5 rounded text-sm font-mono; }
+.md pre  { @apply bg-slate-900 rounded-lg p-3 mb-2 overflow-x-auto; }
+.md pre code { @apply bg-transparent p-0 text-emerald-300; }
+.md blockquote { @apply border-l-2 border-slate-600 pl-3 italic text-slate-400 mb-2; }
+.md strong { @apply font-semibold text-slate-200; }
+.md em     { @apply italic text-slate-300; }
+.md a      { @apply text-blue-400 underline hover:text-blue-300; }
 
 /* SortableJS chosen drag item */
 .drag-chosen { @apply ring-1 ring-slate-400; }
-.md :deep(hr)     { @apply border-slate-700 my-3; }
-.md :deep(table)  { @apply w-full text-sm mb-2 border-collapse; }
-.md :deep(th) { @apply bg-slate-700 text-slate-200 px-2 py-1 text-left border border-slate-600; }
-.md :deep(td) { @apply border border-slate-700 px-2 py-1 text-slate-300; }
-.md :deep(tr:nth-child(even)) { @apply bg-slate-800/50; }
+.md hr     { @apply border-slate-700 my-3; }
+.md table  { @apply w-full text-sm mb-2 border-collapse; }
+.md th { @apply bg-slate-700 text-slate-200 px-2 py-1 text-left border border-slate-600; }
+.md td { @apply border border-slate-700 px-2 py-1 text-slate-300; }
+.md tr:nth-child(even) { @apply bg-slate-800/50; }
