@@ -29,21 +29,48 @@ Infer each field. Do NOT leave any field empty or generic.
 | Field | Rule |
 |-------|------|
 | `title` | Imperative verb + subject, ≤60 chars. No "feature" prefix. (e.g. "Exporter les briefings en CSV") |
-| `description` | Markdown format (see below). Rendered in the Kanban modal — must be valid markdown with `\n\n` between sections. |
+| `description` | Rich markdown format (see below). 5 sections with emojis, lists, and tables. Rendered in the Kanban modal. |
 | `priority` | `P2` default. Upgrade to `P1` if the feature unblocks critical flows. `P0` only if required to ship. |
 | `stack` | Subset of: `backend`, `frontend`, `database`, `devops`, `infrastructure`, `architecture`, `security`, `docs`. Infer from feature nature (UI component → frontend, new endpoint → backend, schema change → database, etc.). At least one value required. |
 | `notes` | Open questions, assumptions, related User Stories, or constraints identified from the codebase scan. Empty string if none. |
 
-**Description format** (mandatory markdown, 2 sections):
-```
-## User Story
-**En tant que** [rôle], je veux **[fonctionnalité]**, afin de **[bénéfice]**.
+**Description format** (mandatory rich markdown — 5 sections with emojis, lists, and tables):
 
-## Contexte
-[Pourquoi cette fonctionnalité est nécessaire, quel problème elle résout, quelles hypothèses ont été faites.]
+> ⚠️ **Règles markdown impératives** — Le dashboard Kanban rend ce markdown en HTML via `marked`.
+> Séparer les sections par une **ligne vide** (`\n\n`), utiliser `- ` pour les listes (pas de virgules),
+> des backticks `` `comme ceci` `` pour les chemins et identifiants, et `**gras**` pour les mots-clés.
+
+```
+## 📋 User Story
+
+**En tant que** [rôle], **je veux** [fonctionnalité], **afin de** [bénéfice].
+
+## 🎯 Contexte
+
+- **Problème actuel** : [ce qui manque ou dysfonctionne aujourd'hui]
+- **Solution envisagée** : [ce que la feature apportera]
+- **Utilisateurs impactés** : [qui bénéficiera de la fonctionnalité]
+
+## 🔧 Portée Technique
+
+| Couche         | Impact                                            |
+|----------------|---------------------------------------------------|
+| Backend        | [endpoints, services, workers — ou "Aucun"]       |
+| Frontend       | [vues, composants, stores — ou "Aucun"]            |
+| Base de données| [migrations, nouveaux modèles — ou "Aucune"]      |
+
+## 📁 Fichiers Pressentis
+
+- `backend/app/routes/...` — [rôle pressenti]
+- `frontend/src/views/...` — [rôle pressenti]
+
+## ❓ Questions Ouvertes
+
+- [Question 1 à résoudre pendant le refine]
+- [Question 2 le cas échéant]
 ```
 
-> ⚠️ When writing the JSON string value, use `\n\n` between sections and `\n` between heading and body. The description is rendered as markdown in the Kanban dashboard.
+> ⚠️ When writing the JSON string value, use `\n\n` between sections and `\n` between heading and body. The description is rendered as markdown in the Kanban dashboard. Never leave a section empty — write "Aucun" if not applicable.
 
 ### 0.3 — Show preview and confirm
 
@@ -51,17 +78,32 @@ Display the qualified story as a preview block:
 
 ```
 📋 Story Preview
-─────────────────────────────────
+─────────────────────────────────────────────
 title       : [title]
-description :
-  ## User Story
-  En tant que [rôle], je veux [fonctionnalité], afin de [bénéfice].
-  ## Contexte
-  [context]
 priority    : [P0/P1/P2]
 stack       : [backend, frontend, ...]
 notes       : [notes or "none"]
-─────────────────────────────────
+
+description :
+  ## 📋 User Story
+  **En tant que** [rôle], **je veux** [fonctionnalité], **afin de** [bénéfice].
+
+  ## 🎯 Contexte
+  - **Problème actuel** : [...]
+  - **Solution envisagée** : [...]
+  - **Utilisateurs impactés** : [...]
+
+  ## 🔧 Portée Technique
+  | Couche | Impact |
+  | Backend | [...] |
+  | Frontend | [...] |
+
+  ## 📁 Fichiers Pressentis
+  - `path/to/file.py` — [rôle]
+
+  ## ❓ Questions Ouvertes
+  - [...]
+─────────────────────────────────────────────
 ```
 
 Ask: **"Create this story? [yes / edit]"**
@@ -92,6 +134,7 @@ Next steps:
 ## Reminders
 
 - ✅ `stack` must always be filled — it's displayed on the Kanban card
-- ✅ Description must follow the "En tant que" user story format
+- ✅ Description must follow the 5-section rich markdown format (emojis, lists, tables) — NOT plain text
 - ✅ Title must be specific enough to understand what the feature does without reading the description
+- ✅ Every section must be filled — write "Aucun" if not applicable, never leave empty
 - ❌ Do not start implementation — this command only creates the backlog entry

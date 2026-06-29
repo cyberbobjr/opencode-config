@@ -30,24 +30,46 @@ Infer each field. Do NOT leave any field empty or generic.
 | Field | Rule |
 |-------|------|
 | `title` | `"Change — [what changes]"` pattern. ≤60 chars. Specific about what is changing. (e.g. "Change — migration SQLite vers PostgreSQL") |
-| `description` | Change request format (see below). Three parts, each on its own line. |
+| `description` | Rich markdown change request format (see below). 4 sections with emojis, lists, and tables. |
 | `priority` | `P2` default. Upgrade to `P1` if it unblocks critical stories. `P0` if it's a prerequisite for release. |
 | `stack` | Changes often touch multiple layers — list all impacted stacks. At least one value required. |
 | `notes` | **Required for changes**: list of impacted stories (US X.Y) and impacted files/modules found during the scan. Note any breaking changes or backward-compatibility risks. |
 
-**Description format** (mandatory markdown, 3 sections):
+**Description format** (mandatory rich markdown — 4 sections with emojis, lists, and tables):
+
+> ⚠️ **Règles markdown impératives** — Le dashboard Kanban rend ce markdown en HTML via `marked`.
+> Séparer les sections par une **ligne vide** (`\n\n`), utiliser `- ` pour les listes (pas de virgules),
+> des backticks `` `comme ceci` `` pour les chemins et identifiants, et `**gras**` pour les mots-clés.
+
 ```
-## Motivation
-[Why this change is needed — the problem it solves or the opportunity it captures.]
+## 🎯 Motivation
 
-## Périmètre
-[What is changing — modules, files, interfaces, contracts, data schemas.]
+[Pourquoi ce changement est nécessaire — le problème qu'il résout ou l'opportunité qu'il capture.]
 
-## Risques
-[Breaking changes, backward compatibility concerns, rollback strategy needed.]
+## 📐 Périmètre
+
+| Module / Fichier               | Changement                                            |
+|--------------------------------|-------------------------------------------------------|
+| `backend/app/models/...`       | [description du changement de schéma ou contrat]      |
+| `backend/app/routes/...`       | [description du changement d'endpoint]                |
+| `frontend/src/...`             | [description du changement d'UI]                      |
+
+## ⚠️ Risques
+
+- **Breaking changes** : [oui/non — détail si oui]
+- **Rétrocompatibilité** : [impact sur les données / API existantes]
+- **Rollback** : [comment revenir en arrière si problème]
+- **Migration de données** : [nécessaire ou non — quelles étapes]
+
+## 📊 Stories Impactées
+
+| Story   | Impact                                    |
+|---------|-------------------------------------------|
+| US X.Y  | [bloquée / à retester / à adapter]        |
+| US X.Z  | [bloquée / à retester / à adapter]        |
 ```
 
-> ⚠️ When writing the JSON string value, use `\n\n` between sections and `\n` between heading and body. The description is rendered as markdown in the Kanban dashboard.
+> ⚠️ When writing the JSON string value, use `\n\n` between sections and `\n` between heading and body. The description is rendered as markdown in the Kanban dashboard. Never leave a section empty — write "Aucun" if not applicable.
 
 ### 0.3 — Show preview and confirm
 
@@ -55,20 +77,29 @@ Display the qualified story as a preview block:
 
 ```
 🔄 Change Story Preview
-─────────────────────────────────
+─────────────────────────────────────────────
 title       : [Change — ...]
-description :
-  ## Motivation
-  [why this change is needed]
-  ## Périmètre
-  [what is changing]
-  ## Risques
-  [breaking changes / rollback]
 priority    : [P0/P1/P2]
 stack       : [backend, database, ...]
 notes       : Impacted stories: US X.Y, US X.Z
               Impacted files: path/to/file.py, ...
-─────────────────────────────────
+
+description :
+  ## 🎯 Motivation
+  [pourquoi ce changement]
+
+  ## 📐 Périmètre
+  | Module | Changement |
+  | `path/to/file.py` | [description] |
+
+  ## ⚠️ Risques
+  - **Breaking changes** : [...]
+  - **Rollback** : [...]
+
+  ## 📊 Stories Impactées
+  | Story | Impact |
+  | US X.Y | [impact] |
+─────────────────────────────────────────────
 ```
 
 Ask: **"Create this story? [yes / edit]"**
@@ -100,7 +131,8 @@ Next steps:
 ## Reminders
 
 - ✅ `notes` must list impacted User Stories and files found during the scan
-- ✅ Description must use the 3-part change request format (Motivation / Périmètre / Risques)
+- ✅ Description must use the 4-section rich markdown format (emojis, lists, tables) — NOT plain text
 - ✅ `stack` often spans multiple layers for change requests — be thorough
+- ✅ Every section must be filled — write "Aucun" if not applicable, never leave empty
 - ✅ The refinement step (`/refine`) will deepen the impact analysis — don't try to be exhaustive here
 - ❌ Do not implement the change — this command only creates the backlog entry

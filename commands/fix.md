@@ -29,24 +29,48 @@ Infer each field. Do NOT leave any field empty or generic.
 | Field | Rule |
 |-------|------|
 | `title` | `"Fix — [concise bug description]"` pattern. ≤60 chars. Specific enough to identify the bug. (e.g. "Fix — refresh token expiré prématurément") |
-| `description` | Bug report format (see below). Three parts, each on its own line. |
+| `description` | Rich markdown bug report format (see below). 5 sections with emojis, lists, and tables. |
 | `priority` | `P1` default for bugs. Use `P0` if production-breaking or blocking. `P2` for minor cosmetic issues. |
 | `stack` | Infer from the impacted component/file found in the scan. At least one value required. |
 | `notes` | Reproduction context: conditions, environment, frequency. File path and line if identified. Related User Story if relevant. |
 
-**Description format** (mandatory markdown, 3 sections):
+**Description format** (mandatory rich markdown — 5 sections with emojis, lists, and tables):
+
+> ⚠️ **Règles markdown impératives** — Le dashboard Kanban rend ce markdown en HTML via `marked`.
+> Séparer les sections par une **ligne vide** (`\n\n`), utiliser `- ` pour les listes (pas de virgules),
+> des backticks `` `comme ceci` `` pour les chemins et identifiants, et `**gras**` pour les mots-clés.
+
 ```
-## Bug
-[What is broken — current observable behavior.]
+## 🐛 Bug
 
-## Contexte
-[When / where it happens — route, component, user action, or condition.]
+[Description du comportement cassé — symptôme observable, message d'erreur.]
 
-## Comportement attendu
-[What the correct behavior should be.]
+## 🔍 Contexte
+
+- **Route / Composant** : `GET /api/...` ou `ComponentName.vue`
+- **Condition déclenchante** : [quand / comment le bug se manifeste]
+- **Fréquence** : [systématique / intermittent / edge case]
+- **Environnement** : [dev / staging / prod]
+
+## ✅ Comportement Attendu
+
+[Ce que le comportement correct devrait être — contraste avec le bug ci-dessus.]
+
+## 📁 Fichiers Impactés
+
+| Fichier                | Rôle                                  |
+|------------------------|---------------------------------------|
+| `backend/app/...`      | [cause racine probable]               |
+| `backend/tests/...`    | [test à ajouter / corriger]           |
+
+## 🔬 Reproduction
+
+1. [Étape 1 — ex: "Créer un profil avec les paramètres X"]
+2. [Étape 2 — ex: "Appeler l'endpoint Y"]
+3. [Résultat observé — ex: "Erreur 500 / KeyError"]
 ```
 
-> ⚠️ When writing the JSON string value, use `\n\n` between sections and `\n` between heading and body. The description is rendered as markdown in the Kanban dashboard.
+> ⚠️ When writing the JSON string value, use `\n\n` between sections and `\n` between heading and body. The description is rendered as markdown in the Kanban dashboard. Never leave a section empty — write "Aucun" if not applicable.
 
 ### 0.3 — Show preview and confirm
 
@@ -54,19 +78,31 @@ Display the qualified story as a preview block:
 
 ```
 🐛 Bug Story Preview
-─────────────────────────────────
+─────────────────────────────────────────────
 title       : [Fix — ...]
-description :
-  ## Bug
-  [current broken behavior]
-  ## Contexte
-  [when/where it happens]
-  ## Comportement attendu
-  [correct behavior]
 priority    : [P0/P1/P2]
 stack       : [backend, ...]
 notes       : [reproduction context or "none"]
-─────────────────────────────────
+
+description :
+  ## 🐛 Bug
+  [symptôme observable]
+
+  ## 🔍 Contexte
+  - **Route / Composant** : [...]
+  - **Fréquence** : [...]
+
+  ## ✅ Comportement Attendu
+  [comportement correct]
+
+  ## 📁 Fichiers Impactés
+  | Fichier | Rôle |
+  | `path/to/file.py` | [cause racine] |
+
+  ## 🔬 Reproduction
+  1. [étape 1]
+  2. [résultat observé]
+─────────────────────────────────────────────
 ```
 
 Ask: **"Create this story? [yes / edit]"**
@@ -97,7 +133,8 @@ Next steps:
 ## Reminders
 
 - ✅ `stack` must always be filled — infer it from the impacted component
-- ✅ Description must use the 3-part bug report format (Bug / Contexte / Attendu)
+- ✅ Description must use the 5-section rich markdown format (emojis, lists, tables) — NOT plain text
 - ✅ `notes` should include any reproduction steps or file paths found during the scan
 - ✅ Priority `P1` is the default for all bugs — only deviate with justification
+- ✅ Every section must be filled — write "Aucun" if not applicable, never leave empty
 - ❌ Do not fix the bug here — this command only creates the backlog entry
