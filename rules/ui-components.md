@@ -1,26 +1,32 @@
 # UI Components & Frontend Development
 
+> Le **stack frontend exact** (framework, gestion d'état, i18n, CSS) et le
+> **catalogue de composants** du projet sont décrits dans `AGENTS.md` et le
+> design system du projet. Ce fichier ne contient que les principes génériques.
+
 ## Before implementing any component or page
 
-1. Read the project's design system — see `AGENTS.md` for the exact location (typically `docs/design-system.md`)
+1. Read the project's design system — see `AGENTS.md` for the exact location (e.g. a `docs/design-system.md` and/or a machine-readable component registry)
 2. The design system defines: available components and their APIs, CSS custom properties, typography, spacing tokens, and visual references
 3. Your implementation MUST visually match the design references described in the project's design system
+4. Before creating a new component, **search the component registry / catalog first** — reuse or extend an existing one rather than duplicating
 
 ---
 
-## Conventions Frontend (Vue 3 / TypeScript)
+## Conventions Frontend
 
-| Règle | Valeur |
-|-------|--------|
-| API | Composition API + `<script setup lang="ts">` |
-| Nommage composants | PascalCase, un composant par fichier |
-| Nommage fichiers | PascalCase `.vue`, camelCase `.ts` |
-| State | Pinia stores, un store par domaine |
-| Appels API | Axios client dans `api/` |
-| Routes | Vue Router, lazy-loaded |
-| i18n | `vue-i18n`, fichiers JSON dans `locales/` |
-| CSS | TailwindCSS utility-first |
-| Design system | Tokens and component catalog defined in the project's design system — see `AGENTS.md` for the exact location |
+> Valeurs concrètes (framework, état, routing, i18n, CSS) dans `AGENTS.md`.
+
+| Principe | Détail |
+|----------|--------|
+| Composants | Un composant par fichier, nommage cohérent avec l'idiome du framework |
+| Fichiers | Cohésifs et courts ; organiser par domaine/feature |
+| État | Centralisé dans des stores, un store par domaine |
+| Appels API | Encapsulés dans une couche `api/` dédiée, jamais inline dans les vues |
+| Routes | Déclaratives et lazy-loaded quand le framework le permet |
+| i18n | Toutes les chaînes visibles passent par le système d'internationalisation |
+| CSS | Utiliser les tokens du design system, jamais de valeurs en dur |
+| Design system | Catalogue de composants + tokens — voir `AGENTS.md` pour l'emplacement |
 
 ---
 
@@ -30,7 +36,7 @@ Never hardcode hex or rgba values. Use the project's CSS custom properties (defi
 
 ```css
 /* ❌ Never */
-color: #C41E3A;
+color: #1a73e8;
 background: rgba(0, 0, 0, 0.5);
 
 /* ✅ Always */
@@ -42,167 +48,68 @@ background: var(--surface-overlay);
 
 ## Internationalisation
 
-All UI strings must go through `vue-i18n`. Never hardcode user-visible text. Translation files in `frontend/src/locales/`.
+All UI strings must go through the project's i18n system. Never hardcode user-visible text. See `AGENTS.md` for the i18n library and the location of translation files.
 
 ---
 
-## Storybook — Règle Impérative
+## Component Stories — Règle Impérative
 
-Tout composant Vue doit avoir une story associée. Cette règle s'applique à **chaque modification** du dossier `frontend/src/components/`.
+Si le projet utilise un explorateur de composants (ex. Storybook), **tout composant
+doit avoir une story associée**. Cette règle s'applique à **chaque modification**
+du dossier de composants.
 
 | Opération | Action obligatoire |
 |-----------|-------------------|
-| Composant créé (`NomComp.vue`) | Créer `NomComp.stories.ts` dans le même dossier |
-| Composant modifié (props, slots, états) | Mettre à jour `NomComp.stories.ts` en conséquence |
-| Composant supprimé | Supprimer `NomComp.stories.ts` |
+| Composant créé | Créer la story correspondante dans le même dossier |
+| Composant modifié (props, slots, états) | Mettre à jour la story en conséquence |
+| Composant supprimé | Supprimer la story |
 
 ### Contenu minimal d'une story
 
-```ts
-import type { Meta, StoryObj } from "@storybook/vue3-vite"
-import NomComp from "./NomComp.vue"
-
-const meta: Meta<typeof NomComp> = {
-  title: "NomComp",
-  component: NomComp,
-  tags: ["autodocs"],
-}
-export default meta
-
-type Story = StoryObj<typeof NomComp>
-
-// Au moins un état "nominal" + un état "vide" ou "erreur" si applicable
-export const Default: Story = { args: { /* props minimales */ } }
-```
+Au moins un état « nominal » + un état « vide » ou « erreur » si applicable.
+Voir `AGENTS.md` / le design system pour le format exact (framework et outil).
 
 ### Critère QA obligatoire
 
-Après toute modification de composant, le quality gate doit inclure :
-
-```bash
-cd frontend && npx storybook build --quiet
-```
-
-Un build Storybook en échec **bloque** le passage en `commit_ready`.
+Après toute modification de composant, le quality gate doit inclure le build de
+l'explorateur de composants (commande exacte dans `AGENTS.md`). Un build en échec
+**bloque** le passage en `commit_ready`.
 
 ---
 
-## Utilisation Exclusive des Composants Storybook
+## Utilisation Exclusive des Composants du Design System
 
-> ⚠️ **Règle impérative** — Tous les fichiers `.vue` (views, layouts, components hors `components/ui/`) doivent utiliser **uniquement les composants Storybook** pour les éléments d'interface.
+> ⚠️ **Règle impérative** — Les vues, layouts et composants composites doivent
+> utiliser **uniquement les composants du design system** pour les éléments
+> d'interface, jamais des primitives HTML brutes.
 
 | Règle | Détail |
 |-------|--------|
-| **Interdiction** | `<input>`, `<select>`, `<button>`, `<textarea>` sont **interdits** dans tout fichier `.vue` hors de `components/ui/` |
-| **Détection** | La règle ESLint `newscap/no-raw-html-elements` bloque ces violations (erreur bloquante) |
-| **Composants manquants** | Si un composant Storybook n'existe pas pour un besoin UI → créer une US dédiée, ne pas utiliser de HTML natif en attendant |
-| **Composants composites** | Les composants composites (CountryThemeSelector, DeliveryTimeSelector, DetailLevelSelector, ChipInput, etc.) doivent utiliser les primitives Storybook |
+| **Interdiction** | `<input>`, `<select>`, `<button>`, `<textarea>` bruts sont **interdits** hors de la couche de primitives du design system |
+| **Détection** | Une règle de lint dédiée bloque ces violations (erreur bloquante) — voir `AGENTS.md` pour son nom |
+| **Composants manquants** | Si un composant n'existe pas pour un besoin UI → créer une US dédiée, ne pas utiliser de HTML natif en attendant |
+| **Composants composites** | Doivent eux-mêmes être construits à partir des primitives du design system |
 
-### Catalogue Storybook disponible
+### Catalogue de composants
 
-#### Primitives (atoms) — `components/ui/`
-
-| Usage | Composant | Props clés |
-|-------|-----------|-----------|
-| Champ texte | `<Input>` | `v-model`, `type`, `error`, `disabled` |
-| Liste déroulante | `<Select>` | `v-model`, `options`, `error` |
-| Bouton | `<Button>` | `variant` (primary/secondary/ghost/danger), `size` (s/m/l), `loading`, `label` |
-| Zone de texte | `<Textarea>` | `v-model`, `rows`, `error` |
-| Cases à cocher | `<CheckboxGroup>` | `v-model`, `options` |
-| Boutons radio | `<RadioGroup>` | `v-model`, `options` |
-| Interrupteur | `<ToggleSwitch>` | `v-model`, `label` |
-| Pastille statut | `<Badge>` | `variant` (success/error/warning/info/neutral), `label` |
-| Étiquette | `<Tag>` | `label`, `removable` |
-| Carte | `<Card>` | slot default, `padding` |
-| Icône | `<Icon>` | `name`, `size` |
-| Chargement inline | `<Spinner>` | `size` |
-| Squelette chargement | `<Skeleton>` | `width`, `height`, `rounded` |
-| Barre progression | `<ProgressBar>` | `value` (0-100), `color` |
-| Notification flottante | `<Toast>` | `variant`, `message`, `duration` |
-| Conteneur toasts | `<Toaster>` | (singleton, pas de props) |
-| Message de champ | `<FieldMessage>` | `type` (error/hint/success) |
-
-#### Molécules — `components/ui/`
-
-| Usage | Composant | Props clés |
-|-------|-----------|-----------|
-| Mot de passe | `<PasswordField>` | `v-model`, `label`, `error`, `show-strength-indicator` |
-| Bannière | `<Alert>` | `variant` (success/error/warning/info), `dismissible` |
-| Fil d'Ariane | `<Breadcrumb>` | `items` |
-| Champ avec label + erreur | `<FormField>` | `label`, `error`, `required`, slot default |
-| Navigation par onglets | `<Tabs>` | `tabs`, `modelValue` |
-| État vide | `<EmptyState>` | `title`, `description`, `icon`, slot `action` |
-
-#### Composants composites — `components/`
-
-| Usage | Composant |
-|-------|-----------|
-| Saisie de tags | `<ChipInput>` |
-| Sélecteur pays/thème | `<CountryThemeSelector>` |
-| Horaire de livraison | `<DeliveryTimeSelector>` |
-| Niveau de détail | `<DetailLevelSelector>` |
-| Sélecteur de profil | `<ProfileSelector>` |
-| Nom du profil | `<ProfileNameSection>` |
-| Barre de progression wizard | `<WizardProgressBar>` |
-| Briefing dashboard | `<DashboardBriefing>` |
-| Modal upgrade | `<UpgradeModal>` |
-| Modal version | `<VersionModal>` |
-
-#### Composants admin — `components/admin/`
-
-| Usage | Composant |
-|-------|-----------|
-| Tableau des sources | `<SourceDataTable>` |
-| Dialogue formulaire source | `<SourceFormDialog>` |
-| Dialogue actions utilisateur | `<UserActionsDialog>` |
-| Onglets détail utilisateur | `<UserDetailTabs>` |
-| Tableau des utilisateurs | `<UserDataTable>` |
-
-#### Composants pipeline — `components/pipeline/`
-
-| Usage | Composant |
-|-------|-----------|
-| Timeline pipeline | `<PipelineTimeline>` |
-| Liste articles scrapés | `<ScrapedArticleList>` |
-
-#### Landing page — `components/`
-
-| Usage | Composant |
-|-------|-----------|
-| Navbar landing | `<LandingNavbar>` |
-| Hero section | `<LandingHero>` |
-| Footer landing | `<LandingFooter>` |
-| Section fonctionnalités | `<FeaturesSection>` |
-| Carte fonctionnalité | `<FeatureCard>` |
-| Mockup animé briefing | `<AnimatedBriefingMockup>` |
-| Bande de confiance | `<TrustStrip>` |
-| Section tarifs | `<PricingSection>` |
-
-#### Layout & Navigation — `components/`
-
-| Usage | Composant |
-|-------|-----------|
-| Navbar dashboard | `<DashboardNavbar>` |
-| Sidebar dashboard | `<DashboardSidebar>` |
-
-> ⚠️ Les éléments HTML natifs `<input>`, `<select>`, `<button>`, `<textarea>` sont **interdits**
-> dans tout `.vue` hors de `components/ui/`.
+Le catalogue complet (primitives, molécules, composants composites, admin, etc.)
+est maintenu dans le **design system / registre de composants du projet** — voir
+`AGENTS.md`. Ne pas dupliquer ce catalogue ici : il dériverait du registre, qui
+est la source de vérité (et souvent lu automatiquement par l'agent TDD).
 
 ### Composants manquants — Process
 
-Si vous avez besoin d'un élément d'interface qui n'a pas d'équivalent Storybook :
+Si vous avez besoin d'un élément d'interface qui n'a pas d'équivalent dans le design system :
 
-1. **Ne pas utiliser de HTML natif** — la règle ESLint le bloque
+1. **Ne pas utiliser de HTML natif** — la règle de lint le bloque
 2. **Créer une US** dans le Backlog pour le composant manquant (`US X.Y — Créer composant <Nom>`)
 3. **Utiliser un composant existant** qui s'en approche le plus en attendant
-4. La nouvelle US doit inclure : `*.vue`, `*.stories.ts`, `__tests__/*.test.ts`, et `*.ui-int.ts` si applicable
+4. La nouvelle US doit inclure le composant, sa story, ses tests unitaires, et ses tests UI-INT si applicable
 5. Une fois l'US terminée, migrer les usages existants vers le nouveau composant
 
 ### Quality Gates
 
-```bash
-cd frontend && npx eslint src                # Bloque les violations
-```
+Lancer le linter sur le code frontend (commande exacte dans `AGENTS.md`) — il bloque les violations.
 
 ---
 
@@ -213,4 +120,4 @@ cd frontend && npx eslint src                # Bloque les violations
 - [ ] Rendering matches the project's design references
 - [ ] Dark mode supported via CSS tokens (no fixed colors)
 - [ ] All user-visible strings go through the i18n system
-- [ ] A Storybook story exists or has been updated for this component
+- [ ] A story exists or has been updated for this component (if the project uses a component explorer)

@@ -29,6 +29,7 @@
 - Run the API spec command from `AGENTS.md` to inspect existing routes — avoid conflicts and duplicates
 - Follow the existing route structure, naming conventions, and auth middleware patterns
 
+
 ## Before adding a new database model or migration
 
 - Check existing models to avoid duplication

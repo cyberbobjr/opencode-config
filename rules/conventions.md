@@ -1,19 +1,23 @@
 # Conventions de Code
 
-## Backend (Python / FastAPI)
+> Les **valeurs concrètes** (formateur et ses options, gestionnaire de paquets,
+> version de langage, frameworks) sont dans `AGENTS.md` à la racine du projet.
+> Ci-dessous : les **principes** qui s'appliquent quel que soit le stack.
 
-| Règle | Valeur |
-|-------|--------|
-| Formateur | ruff (line-length=100) |
-| Type hints | Toujours présents (Pydantic v2, params fonctions) |
-| Imports | `isort` via ruff (stdlib → tiers → local) |
-| Nommage | snake_case variables/fonctions, PascalCase classes |
-| Fichier | 1 modèle = 1 fichier dans `models/` |
-| Routes | 1 endpoint = 1 fonction, préfixe `/api/` |
-| Services | Logique métier dans `services/`, pas dans les routes |
-| Tâches Celery | Infrastructure dans `workers/`, logique métier dans `services/` |
-| Async | Privilégier async/await partout |
-| Configuration | pydantic-settings, lue depuis `.env` |
+## Backend
+
+| Principe | Détail |
+|----------|--------|
+| Formatage | Un formateur unique et déterministe, configuré au niveau du repo (voir `AGENTS.md`) |
+| Typage | Annotations de types présentes sur toutes les signatures publiques et les modèles de données |
+| Imports | Ordre normalisé (stdlib → tiers → local), trié automatiquement |
+| Nommage | Suivre l'idiome du langage (voir `AGENTS.md`) ; noms descriptifs, pas d'abréviations obscures |
+| Organisation | 1 modèle = 1 fichier dans `models/` ; fichiers cohésifs et courts |
+| Routes / contrôleurs | 1 endpoint = 1 fonction ; préfixe d'API cohérent (voir `AGENTS.md`) |
+| Logique métier | Dans `services/`, **jamais** dans les routes ou les contrôleurs |
+| Tâches de fond | Infrastructure (queue/worker) dans `workers/`, logique métier déléguée à `services/` |
+| Concurrence | Suivre le modèle du framework (async/await ou threads) de façon cohérente |
+| Configuration | Lue depuis l'environnement / `.env` via un loader validé, jamais en dur dans le code |
 
 ---
 
@@ -53,12 +57,12 @@ Description courte.
 
 ## Fichiers modifiés
 
-- `frontend/src/components/MyComp.vue` — raison
-- `backend/app/routes/auth.py` — raison
+- `path/to/component` — raison
+- `path/to/route` — raison
 
 ## Tests
 
-- 27 tests backend + 111 tests frontend — couverture 98%
+- N tests — couverture X%
 ```
 
 ### Règles impératives
@@ -67,4 +71,4 @@ Description courte.
 2. **`## ` pour les titres** — jamais de texte nu comme `Fichiers impactés :`
 3. **`- ` pour les listes** — jamais de virgules sur une ligne
 4. **Ne jamais tout mettre sur une seule ligne** — toujours au moins un titre `## ` + paragraphe
-5. **Chemins en backtick** — `` `frontend/src/api/client.ts` ``
+5. **Chemins en backtick** — `` `path/to/file` ``
