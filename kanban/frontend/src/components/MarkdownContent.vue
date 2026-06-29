@@ -3,6 +3,11 @@ import { computed } from 'vue'
 import { marked } from 'marked'
 import DOMPurify from 'dompurify'
 
+marked.use({
+  gfm: true,
+  breaks: true,
+})
+
 const props = defineProps({
   content: { type: String, default: '' },
   placeholder: { type: String, default: '' },
