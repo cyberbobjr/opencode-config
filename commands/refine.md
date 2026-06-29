@@ -175,6 +175,25 @@ Ask **4 to 6 questions** (up to 8 for complex stories). Each question uses the O
 
 ---
 
+### User-Driven Capture (post-personas)
+
+Une fois le cycle des rôles terminé, demander explicitement à l'utilisateur s'il a identifié des points non couverts par les personas avant de passer à la synthèse.
+
+1. Poser cette question via l'outil `question` :
+   > *"Avant la synthèse : avez-vous d'autres points à intégrer dans cette user story qui n'auraient pas été identifiés par les personas ?"*
+   - Options : `Non, les personas ont tout couvert` / `Oui, j'ai des points à ajouter`
+   - `custom: true` est disponible automatiquement pour détailler
+2. **Si l'utilisateur répond « Oui »** — pour chaque point apporté :
+   - **Dans le périmètre de la story** → intégrer dans les ACs (réécrit en assertion testable) et/ou le `implementation_guide`
+   - **Hors périmètre mais pertinent** → créer ou enrichir une story adjacente via `kanban-create-story` / `kanban-update-story` (ne pas élargir le scope de la story courante)
+   - **Hors scope ou déjà couvert** → rejeter avec justification
+   - Consigner chaque décision dans `refine_decisions` lors de la persistance (Step 5)
+3. **Si l'utilisateur répond « Non »** → enchaîner directement sur la synthèse.
+
+> Cette étape capte l'intention et la connaissance métier de l'utilisateur qui dépassent le cadre des 4 personas. Elle ne remplace pas les questions des rôles — elle les complète.
+
+---
+
 ## Step 3 — Synthesis
 
 Once all questions are answered:
