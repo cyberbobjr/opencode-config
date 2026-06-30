@@ -4,6 +4,7 @@ import MarkdownContent from './MarkdownContent.vue'
 import {
   STACK_OPTIONS, STACK_COLORS,
   STATUS_LABELS, STATUS_COLORS,
+  AUDIENCE_OPTIONS, AUDIENCE_COLORS,
 } from '../constants.js'
 
 const props = defineProps({
@@ -14,13 +15,13 @@ const emit = defineEmits(['close', 'save', 'delete'])
 
 const activeTab = ref('spec')
 
-const editData = ref({ stack: [] })
+const editData = ref({ stack: [], audience: [] })
 
 watch(
   () => props.story,
   (s) => {
     if (!s) return
-    editData.value = { stack: [...(s.stack || [])] }
+    editData.value = { stack: [...(s.stack || [])], audience: [...(s.audience || [])] }
   },
   { immediate: true }
 )
@@ -124,11 +125,19 @@ function toggleStack(tag) {
     : [...editData.value.stack, tag]
 }
 
+// ── Audience toggle ───────────────────────────────────────────────────
+function toggleAudience(val) {
+  const idx = editData.value.audience.indexOf(val)
+  editData.value.audience = idx >= 0
+    ? editData.value.audience.filter(a => a !== val)
+    : [...editData.value.audience, val]
+}
+
 // ── Save / Delete ─────────────────────────────────────────────────────
 function handleSave() {
   emit('save', {
     id: props.story.id,
-    changes: { stack: editData.value.stack },
+    changes: { stack: editData.value.stack, audience: editData.value.audience },
   })
 }
 
@@ -217,9 +226,28 @@ function confirmDelete() {
             </div>
           </div>
 
+          <!-- Audience (editable) -->
+          <div>
+            <label class="label">Audience <span class="text-primary ml-1">✎</span></label>
+            <div class="flex flex-wrap gap-2">
+              <button
+                v-for="opt in AUDIENCE_OPTIONS"
+                :key="opt.value"
+                class="text-xs px-2.5 py-1 rounded-full border transition-all"
+                :class="editData.audience.includes(opt.value)
+                  ? 'border-transparent'
+                  : 'border-slate-700 text-slate-500 hover:border-slate-500'"
+                :style="editData.audience.includes(opt.value)
+                  ? { backgroundColor: (AUDIENCE_COLORS[opt.value] ?? '#6b7280') + '30', color: AUDIENCE_COLORS[opt.value] ?? '#9ca3af', borderColor: AUDIENCE_COLORS[opt.value] }
+                  : {}"
+                @click="toggleAudience(opt.value)"
+              >{{ opt.label }}</button>
+            </div>
+          </div>
+
           <!-- Stack (editable) -->
           <div>
-            <label class="label">Stack <span class="text-primary ml-1">✎</span></label><!-- stack tag unchanged -->
+            <label class="label">Stack <span class="text-primary ml-1">✎</span></label>
             <div class="flex flex-wrap gap-2">
               <button
                 v-for="tag in STACK_OPTIONS"

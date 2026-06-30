@@ -21,6 +21,16 @@
 
 ---
 
+## Tests
+
+| Principe | Détail |
+|----------|--------|
+| Fidélité des mocks | Un mock d'une dépendance externe (SDK, API, client) doit reproduire la **forme et le type réels** de sa valeur de retour, pas une version simplifiée plus pratique. Mocker un `dict` là où la dépendance renvoie un objet typé crée un faux sentiment de sécurité : le test passe, le code casse en production. |
+| Extracteur unique | Quand une donnée externe peut prendre plusieurs formes (objet typé, dict, variantes de schéma), centraliser sa lecture dans **un seul** accesseur robuste. Deux extracteurs divergents pour la même donnée sont un piège DRY : l'un est corrigé, l'autre reste buggé. |
+| Test de régression | Tout bug corrigé doit s'accompagner d'un test qui **reproduit la forme exacte** ayant causé l'échec (ici : l'objet typé sans `.get`), pas seulement le cas nominal. |
+
+---
+
 ## Git
 
 | Règle | Valeur |

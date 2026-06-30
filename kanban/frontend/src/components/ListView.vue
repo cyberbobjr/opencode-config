@@ -1,6 +1,6 @@
 <script setup>
 import { ref, computed } from 'vue'
-import { STATUS_LABELS, STATUS_COLORS, STACK_COLORS } from '../constants.js'
+import { STATUS_LABELS, STATUS_COLORS, STACK_COLORS, AUDIENCE_COLORS, AUDIENCE_OPTIONS } from '../constants.js'
 
 const props = defineProps({
   stories: { type: Array, required: true },
@@ -14,6 +14,7 @@ const STATUS_ORDER = Object.fromEntries(
 // ── Filters ───────────────────────────────────────────────────────────
 const activeStatuses = ref(new Set())
 const activeStacks   = ref(new Set())
+const activeAudience = ref(new Set())
 
 const availableStatuses = computed(() => {
   const seen = new Set(props.stories.map(s => s.status))
@@ -23,6 +24,11 @@ const availableStatuses = computed(() => {
 const availableStacks = computed(() => {
   const seen = new Set(props.stories.flatMap(s => s.stack || []))
   return [...seen].sort()
+})
+
+const availableAudience = computed(() => {
+  const seen = new Set(props.stories.flatMap(s => s.audience || []))
+  return AUDIENCE_OPTIONS.filter(o => seen.has(o.value))
 })
 
 function toggleStatus(s) {
@@ -37,12 +43,19 @@ function toggleStack(t) {
   activeStacks.value = next
 }
 
+function toggleAudience(val) {
+  const next = new Set(activeAudience.value)
+  next.has(val) ? next.delete(val) : next.add(val)
+  activeAudience.value = next
+}
+
 function clearFilters() {
   activeStatuses.value = new Set()
   activeStacks.value   = new Set()
+  activeAudience.value = new Set()
 }
 
-const hasFilters = computed(() => activeStatuses.value.size > 0 || activeStacks.value.size > 0)
+const hasFilters = computed(() => activeStatuses.value.size > 0 || activeStacks.value.size > 0 || activeAudience.value.size > 0)
 
 // ── Sort ──────────────────────────────────────────────────────────────
 const sortKey = ref('id')
@@ -64,6 +77,8 @@ const sorted = computed(() => {
     rows = rows.filter(s => activeStatuses.value.has(s.status))
   if (activeStacks.value.size)
     rows = rows.filter(s => (s.stack || []).some(t => activeStacks.value.has(t)))
+  if (activeAudience.value.size)
+    rows = rows.filter(s => (s.audience || []).some(a => activeAudience.value.has(a)))
 
   return [...rows].sort((a, b) => {
     const av = sortKey.value === 'status' ? (STATUS_ORDER[a.status] ?? 99) : (a[sortKey.value] ?? '')
@@ -105,6 +120,20 @@ function formatTs(ts) {
         >{{ STATUS_LABELS[s] }}</button>
       </div>
 
+      <!-- Audience chips -->
+      <div v-if="availableAudience.length" class="flex flex-wrap gap-1 items-center">
+        <span class="text-xs text-slate-500 mr-1">Audience</span>
+        <button
+          v-for="opt in availableAudience"
+          :key="opt.value"
+          class="text-xs px-2 py-0.5 rounded-full border transition-all"
+          :style="activeAudience.has(opt.value)
+            ? { backgroundColor: (AUDIENCE_COLORS[opt.value] ?? '#6b7280') + '30', color: AUDIENCE_COLORS[opt.value] ?? '#9ca3af', borderColor: AUDIENCE_COLORS[opt.value] ?? '#6b7280' }
+            : { borderColor: '#334155', color: '#64748b' }"
+          @click="toggleAudience(opt.value)"
+        >{{ opt.label }}</button>
+      </div>
+
       <!-- Stack chips -->
       <div v-if="availableStacks.length" class="flex flex-wrap gap-1 items-center">
         <span class="text-xs text-slate-500 mr-1">Stack</span>
@@ -137,6 +166,7 @@ function formatTs(ts) {
               { key: 'title',      label: 'Title',   sortable: true  },
               { key: 'status',     label: 'Status',  sortable: true  },
               { key: 'updated_at', label: 'Updated', sortable: true  },
+              { key: 'audience',   label: 'Audience', sortable: false },
               { key: 'stack',      label: 'Stack',   sortable: false },
             ]"
             :key="col.key"
@@ -167,6 +197,18 @@ function formatTs(ts) {
             </span>
           </td>
           <td class="px-3 py-2 font-mono text-xs text-slate-500 whitespace-nowrap">{{ formatTs(s.updated_at) }}</td>
+          <td class="px-3 py-2">
+            <div class="flex gap-1 flex-wrap">
+              <span
+                v-for="val in (s.audience || [])"
+                :key="val"
+                class="text-xs px-1.5 py-0.5 rounded"
+                :style="{ backgroundColor: (AUDIENCE_COLORS[val] ?? '#6b7280') + '25', color: AUDIENCE_COLORS[val] ?? '#9ca3af' }"
+              >
+                {{ AUDIENCE_OPTIONS.find(o => o.value === val)?.label ?? val }}
+              </span>
+            </div>
+          </td>
           <td class="px-3 py-2">
             <div class="flex gap-1 flex-wrap">
               <span

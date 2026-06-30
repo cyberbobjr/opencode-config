@@ -1,6 +1,6 @@
 <script setup>
 import { computed } from 'vue'
-import { STACK_COLORS, STATUS_COLORS, STATUS_LABELS, TRIGGERABLE_STATUSES, KANBAN_COLUMNS } from '../constants.js'
+import { STACK_COLORS, STATUS_COLORS, STATUS_LABELS, TRIGGERABLE_STATUSES, KANBAN_COLUMNS, AUDIENCE_COLORS, AUDIENCE_OPTIONS } from '../constants.js'
 
 const props = defineProps({
   story:     { type: Object,  required: true },
@@ -48,8 +48,14 @@ const nextCol  = computed(() => colIndex.value < KANBAN_COLUMNS.length - 1 ? KAN
     <!-- Title -->
     <p class="text-sm text-slate-200 leading-snug mb-2 line-clamp-2">{{ story.title }}</p>
 
-    <!-- Footer: stack + TDD/QA badges -->
+    <!-- Footer: audience + stack + TDD/QA badges -->
     <div class="flex items-center gap-1.5 flex-wrap">
+      <span
+        v-for="val in (story.audience || [])"
+        :key="val"
+        class="text-xs px-1.5 py-0.5 rounded font-medium"
+        :style="{ backgroundColor: (AUDIENCE_COLORS[val] ?? '#6b7280') + '25', color: AUDIENCE_COLORS[val] ?? '#9ca3af' }"
+      >{{ AUDIENCE_OPTIONS.find(o => o.value === val)?.label ?? val }}</span>
       <span
         v-for="tag in (story.stack || [])"
         :key="tag"

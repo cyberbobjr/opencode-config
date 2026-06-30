@@ -49,6 +49,16 @@ export const PIPELINE_STEPS = [
   { status: 'completed',    label: 'Terminé' },
 ]
 
+export const AUDIENCE_OPTIONS = [
+  { value: 'user',  label: 'Users'  },
+  { value: 'admin', label: 'Admin'  },
+]
+
+export const AUDIENCE_COLORS = {
+  user:  '#3b82f6',
+  admin: '#f59e0b',
+}
+
 export const STACK_OPTIONS = [
   'backend', 'frontend', 'database', 'infrastructure',
   'security', 'api', 'mobile', 'ml', 'devops',

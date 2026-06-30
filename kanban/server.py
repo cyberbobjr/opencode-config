@@ -611,6 +611,8 @@ def _compute_diff(old: dict, new: dict) -> list[str]:
             changes.append("secops_report modifié")
         elif key == "stack":
             changes.append(f"stack: {nv}")
+        elif key == "audience":
+            changes.append(f"audience: {nv}")
         elif key == "priority_score":
             changes.append(f"priority_score: {ov} → {nv}")
         elif key in ("description", "title", "notes", "simplify_comments"):
@@ -662,12 +664,14 @@ rest.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], al
 
 
 @rest.get("/api/stories")
-def api_list(status: str = "", phase: str = ""):
+def api_list(status: str = "", phase: str = "", audience: str = ""):
     items = load_all()
     if status:
         items = [s for s in items if s.get("status") == status]
     if phase:
         items = [s for s in items if str(s.get("phase")) == phase]
+    if audience:
+        items = [s for s in items if audience in s.get("audience", [])]
     return items
 
 
@@ -724,7 +728,7 @@ def api_create(body: dict):
         "title": title, "description": "", "status": "pending",
         "order": next_order, "priority_score": 0,
         "acceptance_criteria": [],
-        "stack": [],
+        "stack": [], "audience": [],
         "tdd": {"status": "pending", "tests": 0, "coverage": "0%", "notes": ""},
         "qa": {"status": "pending", "ac_covered": "0/0", "notes": ""},
         "notes": "", "refine_decisions": [], "implementation_guide": {}, "secops_report": {},
@@ -1142,7 +1146,7 @@ def create_story(title: str, phase: int = 7) -> str:
         "title": title, "description": "", "status": "pending",
         "order": next_order, "priority_score": 0,
         "acceptance_criteria": [],
-        "stack": [],
+        "stack": [], "audience": [],
         "tdd": {"status": "pending", "tests": 0, "coverage": "0%", "notes": ""},
         "qa": {"status": "pending", "ac_covered": "0/0", "notes": ""},
         "notes": "", "refine_decisions": [], "implementation_guide": {}, "secops_report": {},

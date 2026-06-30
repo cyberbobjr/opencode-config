@@ -36,7 +36,8 @@ const filteredStories = computed(() => {
   return stories.value.filter(s =>
     s.id.toLowerCase().includes(q) ||
     s.title.toLowerCase().includes(q) ||
-    (s.stack || []).some(t => t.toLowerCase().includes(q))
+    (s.stack || []).some(t => t.toLowerCase().includes(q)) ||
+    (s.audience || []).some(a => a.toLowerCase().includes(q))
   )
 })
 

@@ -90,7 +90,7 @@ kanban-update-story("$ARGUMENTS", '{"agent_status": "awaiting_input"}')
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: system-ui, sans-serif; background: #f0f0f0; padding: 24px; color: #333; }
   h1 { font-size: 12px; color: #999; margin-bottom: 20px; font-weight: normal; text-transform: uppercase; letter-spacing: 1px; }
-  .screen { background: white; border: 2px solid #bbb; border-radius: 8px; width: 390px; min-height: 600px; overflow: hidden; box-shadow: 0 4px 16px rgba(0,0,0,.12); }
+  .screen { background: white; border: 2px solid #bbb; border-radius: 8px; width: 100%; max-width: 1200px; min-height: 600px; overflow: hidden; box-shadow: 0 4px 16px rgba(0,0,0,.12); }
   .navbar { background: #e0e0e0; height: 52px; display: flex; align-items: center; padding: 0 16px; gap: 12px; }
   .navbar .title { font-weight: 600; font-size: 16px; color: #555; flex: 1; }
   .navbar .action { background: #ccc; border-radius: 4px; padding: 6px 12px; font-size: 12px; color: #666; }
@@ -148,7 +148,7 @@ kanban-update-story("$ARGUMENTS", '{"agent_status": "awaiting_input"}')
 **Rules for the HTML:**
 - **Gray-box only** — no brand colors, no icons — every interactive element must be a labeled text box
 - **Represent all ACs** — every UI element mentioned in an acceptance criterion must appear
-- **Mobile-first (390 px)** unless the story explicitly targets desktop or a specific breakpoint
+- **Desktop (pleine largeur, max 1200 px)** par défaut — utiliser `width: 390px` uniquement si la story cible explicitement le mobile ou un breakpoint spécifique
 - **Use `.placeholder` divs for list content** — don't invent real content
 - **No external dependencies** — fully self-contained, no CDN, no JS
 
