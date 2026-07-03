@@ -25,7 +25,7 @@ Before any question:
 1. Call `kanban-get-story("$ARGUMENTS")` — retrieve description, ACs, priority, phase, stack
 2. Explore existing code to understand the current state (relevant modules, existing patterns)
 3. Identify dependencies, architecture points, and gaps
-4. Call `kanban-list-stories` with the same `phase` — read adjacent stories to detect cross-pollination opportunities
+4. Call `kanban-list-stories` with the same `phase` and `compact=true` — read adjacent stories to detect cross-pollination opportunities (compact keeps the context light; use `kanban-get-story` if you need full detail on one)
 5. Check available backend routes — use the API spec command defined in `AGENTS.md` or `.opencode/rules/commands.md`. If a required route is missing or unexposed, include its creation as part of this story rather than adding a conflicting endpoint later.
 
 **Opportunistic SOLID detection during existing code analysis:**
@@ -40,7 +40,7 @@ business logic in a route, external client without a wrapper, etc.).
 
 1. First check if a `[REFACTO SOLID]` story covering this module already exists:
    ```
-   kanban-list-stories → filter by title containing "[REFACTO SOLID]" + module concerned
+   kanban-list-stories (compact=true) → filter by title containing "[REFACTO SOLID]" + module concerned
    ```
 
 2a. **Existing story found** → enrich its description via `kanban-update-story`:

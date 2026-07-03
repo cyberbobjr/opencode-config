@@ -138,11 +138,15 @@ story_id  str   Story ID (e.g. "US 1.3")
 Lists all stories with optional filters.
 
 ```
-status  str  (optional) filter by status  e.g. "tdd"
-phase   str  (optional) filter by phase   e.g. "1"
+status   str   (optional) filter by status  e.g. "tdd"
+phase    str   (optional) filter by phase   e.g. "1"
+compact  bool  (optional) return only id/title/description/status/phase/priority
 ```
 
-Returns a JSON array of stories.
+Returns a JSON array of stories. Set `compact=true` when you only need to browse
+or pick a story — it strips the heavy `tdd`/`qa`/`secops`/`acceptance_criteria`
+payloads (~84% smaller) and keeps the context light. Use `kanban-get-story` for
+full detail on demand.
 
 ---
 

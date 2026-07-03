@@ -19,7 +19,7 @@ Before creating anything, qualify the story from `$ARGUMENTS` and the codebase.
 
 This is the most important scan of the three commands — changes affect existing code.
 
-- Call `kanban-list-stories` to find related User Stories in the same area
+- Call `kanban-list-stories` with `compact=true` to find related User Stories in the same area (compact keeps the context light — fetch full detail with `kanban-get-story` only if needed)
 - `grep` / `glob` for files, modules, or patterns impacted by the change described in `$ARGUMENTS`
 - Check `AGENTS.md` for the affected stack conventions
 

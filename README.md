@@ -428,7 +428,7 @@ The Kanban server exposes 8 tools:
 | Tool | Description |
 |------|-------------|
 | `kanban-get-story` | Read a full story with all fields |
-| `kanban-list-stories` | List stories, filtered by status or phase |
+| `kanban-list-stories` | List stories, filtered by status or phase (`compact=true` for a lightweight view) |
 | `kanban-update-story` | Partially update a story (TDD results, ACs, implementation guide…) |
 | `kanban-move-story` | Move a story to a new column + log the change |
 | `kanban-create-story` | Create a new story — always sets `status: pending` |
