@@ -1032,15 +1032,26 @@ def get_story(story_id: str) -> str:
     return json.dumps(s or {"error": f"Story {story_id} not found"}, ensure_ascii=False)
 
 
+_COMPACT_FIELDS = ("id", "title", "description", "status", "phase", "priority")
+
+
 @mcp.tool()
-def list_stories(status: str = "", phase: str = "") -> str:
-    """List all stories, filtered by optional status and/or phase."""
-    _mcp_debug("list_stories", "in", status=status or "(all)", phase=phase or "(all)")
+def list_stories(status: str = "", phase: str = "", compact: bool = False) -> str:
+    """List all stories, filtered by optional status and/or phase.
+
+    Set compact=True to return only lightweight fields (id, title, description,
+    status, phase, priority) instead of the full story objects. Use it whenever
+    you just need to browse or pick a story — it avoids flooding the context with
+    tdd/qa/secops/acceptance_criteria payloads. Fetch full detail on demand with
+    get_story."""
+    _mcp_debug("list_stories", "in", status=status or "(all)", phase=phase or "(all)", compact=compact)
     items = load_all()
     if status:
         items = [s for s in items if s.get("status") == status]
     if phase:
         items = [s for s in items if str(s.get("phase")) == phase]
+    if compact:
+        items = [{k: s.get(k) for k in _COMPACT_FIELDS} for s in items]
     _mcp_debug("list_stories", "out", count=len(items),
         ids=[s["id"] for s in items] if KANBAN_DEBUG and len(items) <= 10 else f"{len(items)} stories",
     )
