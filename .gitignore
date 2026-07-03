@@ -7,5 +7,11 @@ kanban/kanban.log
 kanban/__pycache__/
 kanban/*.pyc
 
+# SQLite local state (JIRA sync, kanban store) — local only, never commit
+kanban/*.db
+kanban/*.db-journal
+kanban/*.db-wal
+kanban/*.db-shm
+
 # Local env — never commit, use .env.example instead
 .env

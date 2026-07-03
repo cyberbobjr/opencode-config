@@ -269,6 +269,7 @@ async def start_jira_sync():
 
 ### Ordre recommandé
 
+0. **Config & artefacts** : ajouter `kanban/*.db` (+ `-wal`/`-shm`/`-journal`) au `.opencode/.gitignore` — la `sync.db` est un état **local jamais committé** — et documenter les variables JIRA dans `.opencode/.env.example` (déjà fait, section « JIRA ↔ Kanban integration »).
 1. `jira_client.py` — GET sprint + GET search (assignee) + POST comment.
 2. `sync_state` SQLite — lecture/écriture.
 3. Full sync au démarrage (lecture seule, aucun write).
