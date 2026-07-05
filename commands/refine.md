@@ -76,9 +76,16 @@ kanban-update-story("$ARGUMENTS", '{"agent_status": "awaiting_input"}')
 
 ### UI Wireframe (frontend / fullstack stories only)
 
-**If the story type is `frontend` or `fullstack`**, generate an HTML wireframe and open it **before Q1** so the visual layout anchors the dialogue.
+> ⚠️ **Do NOT create a wireframe systematically.** First decide whether the story touches a **new screen** or an **existing page**:
+>
+> - **The page/screen does NOT exist yet** → generate a gray-box HTML wireframe (steps below) to anchor the dialogue.
+> - **The page/screen ALREADY exists** (the story modifies/extends an existing view) → do **not** invent a gray-box mockup. Instead, **start from the real page**: identify the existing route (e.g. `/admin/pipeline`), and if the app is running, capture the current screen (navigate + screenshot) — otherwise locate and read the existing view file. Then **annotate the real page with the proposed adjustments** (an HTML overlay/redlines on the screenshot, or a short "existing element → proposed change" list). Attach that as the mockup so the dialogue is grounded in what already ships, not a redrawn approximation.
+>
+> Rationale (user feedback 2026-07-05): a fresh gray-box for a page that already exists throws away real layout/context and risks diverging from production. Reuse the page, propose deltas.
 
-1. Write a self-contained HTML file to `/tmp/wireframe-$ARGUMENTS.html` using this template — fill in the `<div class="screen">` with the UI elements inferred from the description and ACs:
+**If a wireframe is warranted** (new screen, or the annotated-real-page variant above), open it **before Q1** so the visual anchors the dialogue.
+
+1. For a **new screen**, write a self-contained HTML file to `/tmp/wireframe-$ARGUMENTS.html` using this template — fill in the `<div class="screen">` with the UI elements inferred from the description and ACs. For an **existing page**, embed the real screenshot and overlay the proposed changes (or list the deltas) instead of the gray-box template:
 
 ```html
 <!DOCTYPE html>
