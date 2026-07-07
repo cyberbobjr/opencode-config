@@ -74,22 +74,24 @@ For each acceptance criterion, determine the required test type:
 | Business behavior | Integration | stack test tool + test DB |
 | Frontend display rule | Component | frontend test tool (see agents_md) |
 | Complete user journey | UI integration | UI-INT test tool (see agents_md) |
-| AC text contains `[UI-INT]` | UI integration | UI-INT test tool (see agents_md) |
+| AC text contains `[UI-INT]` | UI integration | **Playwright** — `*.ui-int.ts` run via `npm run test:ui-int` (= `playwright test`, NEVER vitest) |
 | Background worker / queue | Integration | stack test tool + broker mock |
+| Documentation (README.md update) | Doc review | Read the relevant README(s) + story notes (no automated test) |
 
 For each AC, write a test that:
 1. **Explicitly verifies the behavior described in the AC**
 2. Tests the nominal case (success) AND the error case (failure) where applicable
 3. Includes a clear assertion of the expected result
 
-### 2bis. Verify UI-INT test files exist on disk (⚠️ MANDATORY)
+### 2bis. Verify + RUN UI-INT (Playwright) tests (⚠️ MANDATORY)
 
 **For every AC** whose text contains `[UI-INT]`:
 
 1. Use `glob("frontend/src/**/*.ui-int.ts")` to discover existing Playwright test files
 2. If no `*.ui-int.ts` files exist at all → this AC **must fail** — the test file was never created
 3. If the glob finds files, verify that at least one test covers the specific scenario described in the AC
-4. For missing coverage, produce:
+4. **Run the matching file with `npm run test:ui-int` (= `playwright test`) — NEVER vitest (`test:unit` / `test:storybook`).** Running `*.ui-int.ts` through vitest gives false negatives (admin-route redirection — see project memory `project_uiint_playwright_runner`). `checked: true` requires the Playwright run to **PASS**, not merely the file to exist. If the environment cannot launch a browser, fall back to file-existence and record in `notes` that the Playwright runner was unavailable (do not silently pass).
+5. For missing coverage (no file) or a failing/redirecting run, produce:
    ```
    ac_id: "AC X"
    title: "<AC text>"
@@ -117,6 +119,22 @@ For each AC, write a test that:
    cause: "Migration was never applied — story must return to TDD"
    ```
 4. If no pending migrations: verify expected columns exist using the DB introspection command defined in `AGENTS.md` for this stack. If columns are missing → fail QA with the same structure above.
+
+### 2quater. Validate the README.md documentation AC (⚠️ MANDATORY)
+
+Every refined story carries a mandatory documentation AC (added by `/refine`). Validate it — QA **never edits the README itself**:
+
+1. Read the relevant README(s) for the story's stack (root `README.md`, `backend/README.md`, `frontend/README.md`).
+2. `checked: true` only if they reflect this story's change (new command / endpoint / env var / visible behavior) **OR** the story `notes` explicitly justify that no doc change was needed.
+3. A doc-worthy change with no README update **and** no justification → the AC **fails** (`checked: false`), with:
+   ```
+   ac_id: "AC <n>"
+   title: "Documentation — README.md à jour"
+   test_failing: "README review"
+   assertion: "README should document this change (or notes should justify no change)"
+   file: "README.md | backend/README.md | frontend/README.md"
+   cause: "Change is documentation-worthy but no README update nor justification found"
+   ```
 
 ### 3. Write and run tests
 
@@ -172,9 +190,11 @@ cause        = "middleware checks expiration before refresh"
 
 1. **Update individual ACs (⚠️ MANDATORY — do NOT skip)** — You MUST update every individual AC's `checked` flag before updating `qa.status`. This is a hard requirement; the previous QA agent ran multiple times without doing it.
 
-   Rule: `checked: true` if and only if the test covering that AC passes AND (for UI-INT ACs) the Playwright test file physically exists on disk. `checked: false` if the AC's test fails or the UI-INT file is missing.
+   Rule: `checked: true` if and only if the test covering that AC passes AND (for UI-INT ACs) the Playwright `*.ui-int.ts` file physically exists on disk **and its `npm run test:ui-int` run passes** (never vitest). `checked: false` if the AC's test fails, the UI-INT file is missing, or its Playwright run fails/redirects.
 
-   Special rule for UI-INT ACs: `checked` must remain `false` if no `*.ui-int.ts` file exists on disk — even if you wrote unit/component tests that partially validate the behavior. Only a real Playwright UI-INT test qualifies.
+   Special rule for UI-INT ACs: `checked` must remain `false` if no `*.ui-int.ts` file exists on disk — even if you wrote unit/component tests that partially validate the behavior. Only a real Playwright UI-INT test, executed via `npm run test:ui-int` and passing, qualifies.
+
+   Documentation AC: `checked: true` only if the relevant README(s) reflect the change or the story notes justify no change (see section 2quater).
 
    Retrieve the full AC list from `story_json.acceptance_criteria`, then call:
    ```
@@ -219,3 +239,5 @@ cause        = "middleware checks expiration before refresh"
 - ✅ QA tests complement TDD tests: they validate ACs end-to-end
 - ✅ For frontend stories, prefer component tests and UI-INT tests (see agents_md)
 - ✅ If an AC is already covered by a TDD test, note it without duplicating
+- 🎭 `[UI-INT]` ACs are Playwright: run them with `npm run test:ui-int` (= `playwright test`, NEVER vitest — false negatives); `checked: true` requires a passing run, not just an existing file
+- 📘 Always validate the mandatory README.md documentation AC (read the README, confirm it reflects the change or that the notes justify no change) — never edit the README yourself

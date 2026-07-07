@@ -36,6 +36,8 @@ PROJECT CONVENTIONS:
 
 Instructions:
 - Validate all acceptance criteria using the test type appropriate to each AC (unit / integration / UI-INT)
+- `[UI-INT]` ACs are Playwright: RUN them via `npm run test:ui-int` (= `playwright test`), NEVER vitest (`test:unit` / `test:storybook`) — false negatives from admin-route redirection (project memory `project_uiint_playwright_runner`); `checked: true` requires a passing Playwright run, not just an existing file.
+- Validate the mandatory README.md documentation AC: read the relevant README(s) and confirm they reflect the change, or that the story notes justify no doc change — never edit the README yourself.
 - Run tests with:
   `cd backend && uv run pytest tests/unit/ tests/integration/ --tb=short -q`
 - Unit tests are in `tests/unit/` (marker: `unit`),

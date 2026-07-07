@@ -197,7 +197,7 @@ If `has_ui_int = true` (step 1.7):
    ```
 3. Use `page.route()` to intercept and mock ALL API calls the page makes — no real backend needed
 4. **Mandatory boundary tests**: at least one nominal test (success) + one error test (timeout, 4xx, 5xx, empty data)
-5. Run with `npm run test:ui-int` (must fail at RED stage)
+5. Run with `npm run test:ui-int` (= `playwright test`) — it MUST fail at RED stage. ⚠️ **Never run `*.ui-int.ts` through `test:unit` / `test:storybook` / vitest**: vitest gives false negatives (admin-route redirection — see project memory `project_uiint_playwright_runner`). Only the Playwright runner is authoritative.
 6. File naming convention: `*.ui-int.ts` (auto-discovered by playwright.config.ts)
 
 ---
@@ -283,6 +283,14 @@ Once tests are green:
 If any point fails → refactor now, before the quality gates.
 
 ---
+
+### 4bis. Documentation — satisfy the mandatory README AC (⚠️ MANDATORY)
+
+Every refined story carries a mandatory `README.md` documentation AC. To make it pass at QA, TDD must actually deliver it:
+
+1. If this story adds/changes anything user- or dev-facing (new command, endpoint, env var, config, visible behavior) → **update the relevant README(s)**: root `README.md`, `backend/README.md`, and/or `frontend/README.md` per the story's stack.
+2. If the change has **no** documentation impact → do NOT touch the README, but state the justification explicitly in the TDD `notes` (e.g. "internal refactor, no user/dev-facing change → README unchanged") so QA can validate the AC on that basis.
+3. Keep it factual and minimal — document what changed, not the whole feature. This is a real file deliverable, not a test (no RED/GREEN).
 
 ### 5. Quality Gates
 
@@ -406,3 +414,5 @@ If the story creates or modifies a backend endpoint:
 - ✅ Follow project conventions (from agents_md)
 - ✅ For frontend, strictly follow the design system
 - ✅ If blocked, return `status: failed` with notes explaining the blocker
+- 🎭 `*.ui-int.ts` are Playwright only — run via `npm run test:ui-int` (= `playwright test`), NEVER vitest / `test:unit` / `test:storybook` (false negatives)
+- 📘 Satisfy the mandatory README.md documentation AC: update the relevant README when the change is user/dev-facing, else justify "no doc impact" in `notes` (see step 4bis)

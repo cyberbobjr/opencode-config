@@ -206,8 +206,14 @@ Une fois le cycle des rôles terminé, demander explicitement à l'utilisateur s
 Once all questions are answered:
 
 1. **Summarize decisions** — each question → decision → impact on the ACs
-2. **Produce revised ACs** — integrate all decisions; every AC must be a testable assertion (Given/When/Then or equivalent — no vague "user can..." phrasing)
-3. **List complementary suggestions and their outcome**:
+2. **Produce revised ACs** — integrate all decisions; every AC must be a testable assertion (Given/When/Then or equivalent — no vague "user can..." phrasing). **The AC list MUST always end with a mandatory documentation AC** (in addition to the functional ACs), never omitted even for a small fix:
+   `{"id": N, "text": "Documentation — le(s) README.md impacté(s) sont mis à jour pour refléter ce changement (commande, endpoint, variable d'env, comportement visible) ; si le changement n'a aucun impact documentaire, l'absence de mise à jour est justifiée dans les notes de la story.", "checked": false}`
+   Adapt the wording to the relevant README (root / `backend/` / `frontend/`) when identifiable.
+3. **Per-AC test tool (decision rule — record it in `test_strategy`):**
+   - **UI / user-flow AC** → tag `[UI-INT]`, validated by **Playwright** (`frontend/src/**/*.ui-int.ts` + `page.route()` mocks), run with **`npm run test:ui-int`** (= `playwright test`) — **never vitest** (`test:unit` / `test:storybook`): false negatives from admin-route redirection (see project memory `project_uiint_playwright_runner`).
+   - **Backend / logic / API-contract AC** → **pytest** (`unit` if pure, `integration` if HTTP/DB). Do **NOT** drive it through Playwright.
+   - A front AC scoped to an isolated component → component test + story, not necessarily a full Playwright flow.
+4. **List complementary suggestions and their outcome**:
 
 ```
 ## Complementary suggestions
@@ -217,7 +223,7 @@ Once all questions are answered:
 | [proposed idea] | [role] | ✅ Adopted / ❌ Rejected / 🔍 To investigate |
 ```
 
-4. **Readiness check**:
+5. **Readiness check**:
    - ✅ **Ready** → continue to Step 4
    - ⚠️ **Blockers** → list what is blocking, propose a path forward; do NOT advance until resolved
 
@@ -354,7 +360,8 @@ kanban-update-story("$ARGUMENTS", '{
   "stack": ["backend", "database"],
   "acceptance_criteria": [
     {"id": 1, "text": "AC 1 as a testable assertion [UI-INT]", "checked": false},
-    {"id": 2, "text": "AC 2 as a testable assertion", "checked": false}
+    {"id": 2, "text": "AC 2 as a testable assertion", "checked": false},
+    {"id": 3, "text": "Documentation — le(s) README.md impacté(s) sont mis à jour pour refléter ce changement (commande, endpoint, variable d'env, comportement visible) ; si le changement n'a aucun impact documentaire, l'absence de mise à jour est justifiée dans les notes de la story.", "checked": false}
   ],
   "refine_decisions": [
     "Decision 1 made during refinement",
@@ -384,7 +391,7 @@ kanban-update-story("$ARGUMENTS", '{
     "test_strategy": {
       "unit": "tests/unit/test_<module>.py — pytestmark = pytest.mark.unit — pure functions, 0 I/O, mocks for external dependencies. Test: [what deserves a unit test]",
       "integration": "tests/integration/test_<feature>_api.py — pytestmark = pytest.mark.integration — httpx.AsyncClient + ASGITransport + real test SQLite DB. Minimum: 1 success + 1 4xx error + edge cases",
-      "e2e": "frontend/src/<feature>.ui-int.ts — Playwright + page.route() — or null if no frontend",
+      "e2e": "frontend/src/<feature>.ui-int.ts — Playwright + page.route(), run via `npm run test:ui-int` (= playwright test, NEVER vitest) — or null if no frontend",
       "coverage_target": 80,
       "critical_cases": ["Edge case 1 that must never regress", "Edge case 2"]
     },
@@ -399,6 +406,7 @@ kanban-update-story("$ARGUMENTS", '{
 **Before calling `kanban-move-story` to advance**, verify every item:
 
 - [ ] `files_create` and `files_modify` have exact paths (no `src/...` stubs)
+- [ ] **Mandatory documentation AC present** — the AC list always ends with the `README.md` update AC (never omitted)
 - [ ] `steps` are granular enough that each maps to ≤ 1 file or 1 test fixture
 - [ ] `test_strategy` has content in every relevant field — not a generic sentence
 - [ ] `critical_cases` lists at least the edge cases identified during the dialogue
