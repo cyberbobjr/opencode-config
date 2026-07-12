@@ -16,17 +16,27 @@ Thin orchestrator wrapper that assembles context, determines the correct mode, a
    - `AGENTS.md` — stack info (Identité table)
    - `.opencode/rules/commands.md` — test run commands, quality gate commands
    - `.opencode/rules/conventions.md` — design system reference (if `implementation_guide.scope` contains `frontend`)
-3. **Capture the test baseline** — run the full test suite NOW, before any code is written, and record which tests are currently failing:
+3. **Capture the test baseline (scoped to the story's own test files)** — before any code is written, run ONLY the test files that this story will create or touch. The full suite runs exactly once: at the final regression sweep. The Red-Green loop runs only these same scoped files (see `TEST STRUCTURE` below). A test already red in the baseline is *pre-existing*, not a regression.
 
-   **Backend** (always run even for frontend-only stories — shared fixtures can regress):
+   Determine the test file paths from `implementation_guide.files_create` + `files_modify`:
+
+   - For each file in `files_create` or `files_modify` under `backend/app/`, derive its test file(s) at the matching path under `tests/` (e.g. `app/services/foo.py` → `tests/unit/test_foo.py` + `tests/integration/test_foo_api.py`)
+   - For each file matching `tests/**/test_*.py` already listed in `files_create` or `files_modify`, use it directly
+   - If the derivation is ambiguous, fall back to `files_create` paths that contain "test" or end with `.py` under `tests/`
+   - If no test file can be derived (greenfield story, no tests exist yet) → the baseline is empty, skip the run
+
+   **Backend** (only if `implementation_guide.scope` contains `backend`):
    ```bash
-    cd backend && uv run pytest tests/unit/ tests/integration/ --tb=no -q 2>&1 | tail -30
+    cd backend && uv run pytest <scoped-test-paths> --tb=no -q 2>&1 | tail -30
    ```
+   If no test files exist yet for this story, skip.
    Capture: total passing, total failing, and the exact list of `FAILED` / `ERROR` test node IDs.
 
    **Frontend** (if `implementation_guide.scope` contains `frontend`):
+   Derive paths: extract from `files_create` + `files_modify` any paths matching `*.unit.ts` or `*.ui-int.ts`. If none exist, skip.
    ```bash
-   npm --prefix frontend run test:unit -- --reporter=verbose 2>&1 | tail -20
+   npm --prefix frontend run test:unit -- <scoped-unit-test-paths> --reporter=verbose 2>&1 | tail -20
+   npx playwright test <scoped-ui-int-paths> 2>&1 | tail -20
    ```
    Capture: total passing, total failing, and the list of failing test names.
 
@@ -58,16 +68,37 @@ STORY JSON:
 PROJECT CONVENTIONS:
 [paste: stack info from AGENTS.md + test/quality gate commands from .opencode/rules/commands.md + design system ref from .opencode/rules/conventions.md if implementation_guide.scope contains "frontend"]
 
-TEST STRUCTURE:
+IMPLEMENTATION PRINCIPLES (non-negotiable):
+- YAGNI — implement EXACTLY the story's ACs, nothing more. No speculative fields, endpoints, config flags, or abstractions "for later". One test per AC; do not invent tests for behaviour the ACs don't require.
+- KISS — the simplest implementation that makes the AC test pass wins. No premature generalization, no design pattern that isn't earned by a present, concrete need in this story.
+- SOLID (new/modified code only, no retroactive rewrite) — inject the DB session as a parameter (never `get_async_session_factory()()` in a service body); one responsibility per service; consume shared clients (Firecrawl, LLM, Redis, Neo4j, SMTP) through their `app/services/*.py` wrapper, never instantiated ad-hoc in a route or worker. Define an interface only when the component is actually mocked in a unit test — not speculatively.
+- If an AC seems to need speculative machinery to satisfy, that is a signal the AC is wrong: stop and flag it, do not build the machinery.
+
+TEST STRUCTURE & SCOPED EXECUTION:
 - tests/unit/        → pytestmark = pytest.mark.unit    — 0 I/O, pure logic, mocks
 - tests/integration/ → pytestmark = pytest.mark.integration — AsyncClient + real test SQLite DB
 - Every new test file MUST be placed in one of these two directories
-- Unit test command      : uv run pytest tests/unit/ -m unit -q
-- Integration test command: uv run pytest tests/integration/ -m integration -q
-- Full test command      : uv run pytest tests/unit/ tests/integration/ -q
 
-BASELINE (captured before any implementation — used for regression detection):
-[paste the full output of the baseline test runs from Phase 1 — backend + frontend if applicable.
+Red-Green loop → run ONLY this story's own test file(s) (KISS: fast, focused feedback — do NOT run the whole suite on every iteration):
+- Focused backend run : uv run pytest <exact path(s) of THIS story's test file(s)> -q
+    e.g. uv run pytest tests/unit/test_<module>.py tests/integration/test_<feature>_api.py -q
+    Narrow further to a single AC with -k "<node id>" while iterating on one assertion.
+- Focused frontend run: npm --prefix frontend run test:unit -- <this story's *.unit.ts>
+    UI-INT: npx playwright test <this story's *.ui-int.ts>  (from frontend/, via playwright — NEVER vitest)
+- Do NOT widen the run to unrelated modules mid-loop "to check nothing broke" — that is the final sweep's job.
+
+Final regression sweep → run ONCE, only after this story's tests are green:
+- Full backend command : uv run pytest tests/unit/ tests/integration/ -q
+- Full frontend command: npm --prefix frontend run test:unit   (+ playwright for UI-INT if scope contains frontend)
+- Diff against BASELINE:
+  * For tests IN the baseline: PASS→FAIL = regression from this story → fix it.
+    FAIL→FAIL = pre-existing → do NOT touch.
+  * For tests NOT in the baseline: if they FAIL, report them as "unknown baseline — could be pre-existing" — do NOT block the story on them. Only block the story on regressions in scoped tests.
+
+BASELINE (scoped — captured before any implementation on this story's own test files):
+[paste the output of the scoped baseline run from Phase 1.
+ This covers ONLY the test files this story creates or modifies — NOT the full suite.
+ Tests not in this baseline are checked in the final regression sweep only.
  Include: total counts AND the exact FAILED/ERROR test node IDs.]
 
 [include only if implementation_guide.mockup_ref is set AND scope contains "frontend":]

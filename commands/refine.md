@@ -13,7 +13,23 @@ Refines story `$ARGUMENTS` by challenging its acceptance criteria from 4 angles 
 - **Refinement is a mandatory dialogue** — do NOT produce a report alone. Challenge the requirement, propose improvement paths, go further into expressed needs.
 - **One question at a time** — each question uses the OpenCode `question` tool; wait for the answer before the next.
 - **3 closed options max per question** (concrete choices, not empty "yes/no") — `custom: true` is available automatically via the tool.
-- **Every question must have a concrete impact** on the implementation — no rhetorical questions, no questions whose answer changes nothing.
+- **Every option is a trade-off, made explicit** — each option MUST carry a one-line **✅ Pour** (main advantage) and a one-line **❌ Contre** (main cost/risk). Never present a bare label the user has to decipher; the user should be able to decide from the Pour/Contre alone.
+- **The agent always states its preferred option** — mark exactly one option `⭐ Recommandé` and justify the recommendation in one sentence. The user stays free to pick another (or `custom`), but a refinement dialogue must never be a neutral menu: the agent has an informed opinion and defends it.
+- **Fonction → Cohérence → Simplicité, in that order, is the ranking cascade** — the recommendation is *not* a taste call. Apply the three criteria sequentially, each as a filter on the previous result:
+
+  1. **Fonction** — start with the option that delivers the most business value to the user. This is the primary criterion: the feature exists for the user, not for the architecture.
+  2. **Cohérence** — if the most valuable option creates an inconsistency with the rest of the app (different UX, contradictory navigation, unexpected behavior), check whether the next option is worth the trade-off.
+  3. **Simplicité** — if two options deliver equivalent value, the simplest for the user wins. No unnecessary functional complexity.
+
+  Visualise the cascade as:
+  ```
+  Fonction (most valuable for user) → Cohérence violation detected?
+    → YES → next option (does it deliver equivalent value? → YES → new recommendation)
+         → next option (value gap is too wide? → back to Fonction pick + note the incoherence)
+    → NO → Fonction pick wins → Simplicité tie-breaker if needed
+  ```
+  A coherent but simpler UX today is better than an inconsistent feature that tries to do everything.
+- **Every question must have a concrete impact** on the feature — no rhetorical questions, no questions whose answer changes nothing.
 - **At least 1 question in 2 must propose a new idea** — not just challenge existing ACs, but suggest an addition the story has not anticipated.
 - **If an AC remains ambiguous after the dialogue**, rewrite it until it is an unambiguous, testable assertion before advancing. "User can..." is not a testable assertion.
 
@@ -168,27 +184,88 @@ kanban-update-story("$ARGUMENTS", '{"agent_status": "awaiting_input"}')
 
 ---
 
-Ask **4 to 6 questions** (up to 8 for complex stories). Each question uses the OpenCode `question` tool.
+Ask **exactly 5 questions**, one per principle. Each question follows the Decision → Impact → Options structure described below. Do not add extra questions.
 
-| Question | Lead role | Challenge objective | Ideation mission |
-|----------|-----------|---------------------|-----------------|
-| 1 | **Product Owner** | Business value, hidden needs | What adjacent feature could multiply value for the user? |
-| 2 | **Architect** | Technical consistency, patterns | What emerging pattern would improve overall consistency? |
-| 3 | **Developer** | Edge cases, implementation clarity, tests, test placement (unit vs integration) | What edge case could become a reusable utility? Identify if the logic is pure (→ `tests/unit/`) or coupled to HTTP/DB (→ `tests/integration/`). If both, propose a decoupling to make business logic unit-testable. |
-| 4 | **DevSecOps** | Attack surfaces, countermeasures | What uncovered threat deserves a dedicated protection feature? |
-| 5 | **Product Owner** | Functional gaps, unexpressed needs | What need from adjacent stories should be addressed here? |
-| 6 | **Architect** | Dependencies, integration, scalability | What cross-cutting optimization (cache, batch, streaming) could be anticipated? |
-| 7+ | (cycle continues if needed, max 8) | | |
+| # | Principe | Rôle | Impact fonctionnel (ce qui change selon la réponse) | Question à poser |
+|---|----------|------|-----------------------------------------------------|------------------|
+| 1 | **Périmètre fonctionnel** | Product Owner | Définit ce que la feature livre exactement vs ce qui est repoussé en backlog. L'utilisateur doit sentir qu'un "non" est aussi valable qu'un "oui". | "Quelle est la valeur métier immédiate ? Parmi les prolongements possibles, lesquels sont réellement nécessaires *maintenant* pour servir l'utilisateur ?" |
+| 2 | **Architecture d'écran** | UX / Product Owner | Décide le nombre de vues, leur organisation, et les points de navigation. Impact direct sur l'écran principal, les modales, et le parcours utilisateur. | "Voici deux organisations d'écran possibles pour cette feature. Laquelle rend le parcours le plus fluide pour l'utilisateur ?" |
+| 3 | **Arbitrage fonctionnel** | Product Owner | Tranche entre deux comportements légitimes mais différents. L'option choisie détermine l'expérience utilisateur et les cas d'usage couverts. | "Entre ces deux comportements, lequel correspond le mieux à l'intention métier ? Que perd-on en ne choisissant pas l'autre ?" |
+| 4 | **Règles métier & accès** | Product Owner | Définit qui peut faire quoi, quelles données sont visibles ou modifiables, et les contraintes fonctionnelles (validation, limites). | "Qui peut accéder à cette fonctionnalité ? Quelles données voit-il ? Que peut-il créer, modifier, supprimer ? Y a-t-il des limites (quotas, seuils) ?" |
+| 5 | **États & retours utilisateur** | Product Owner | Couvre ce que l'utilisateur voit et peut faire dans les situations non-nominales : vide, erreur, chargement, succès, confirmation. Impact direct sur les messages, les écrans d'état, et les feedbacks. | "Que voit l'utilisateur quand la liste est vide ? Quand une action échoue ? Quand ça charge ? Après une action réussie ?" |
 
 ---
 
-### User-Driven Capture (post-personas)
+### Question option format (MANDATORY per question)
 
-Une fois le cycle des rôles terminé, demander explicitement à l'utilisateur s'il a identifié des points non couverts par les personas avant de passer à la synthèse.
+Every question **begins by stating its impact fonctionnel** — one sentence explaining what changes in the feature depending on the answer — before presenting the options:
+
+> *"Ta réponse va déterminer [quoi — ex: le nombre d'écrans, ce que voit l'utilisateur, les données affichées, les actions disponibles]."*
+
+Then present the options with a Pour/Contre and one recommendation. Each Pour/Contre names the functional criterion (Fonction/Cohérence/Simplicité) that is respected or violated. Template:
+
+```
+[One-line framing of the functional decision to make — what concrete dimension of the user experience depends on this answer.]
+
+Option A — <concrete functional choice> ⭐ Recommandé
+  ✅ Pour  : <main functional advantage — name the criterion respected, e.g. "l'utilisateur trouve l'info en un clic → Fonction">
+  ❌ Contre : <main cost/risk>
+
+Option B — <concrete functional choice>
+  ✅ Pour  : <main functional advantage>
+  ❌ Contre : <cost — name the criterion violated, e.g. "incohérent avec le reste de l'app → Cohérence">
+
+Option C — <concrete functional choice>
+  ✅ Pour  : <main functional advantage>
+  ❌ Contre : <cost — name the criterion violated, e.g. "plus complexe pour l'utilisateur sans valeur ajoutée → Simplicité">
+
+Pourquoi ⭐ : <apply the Fonction→Cohérence→Simplicité cascade in one sentence: start with the most valuable option, check Cohérence, check Simplicité, decide>.
+```
+
+Instructions for writing the "Pourquoi ⭐" justification:
+
+```
+1. Start with the Fonction pick: "Fonction donnerait [option X]"
+2. Check Cohérence: "mais X est incohérent avec le pattern existant [pattern] → ce compromis est justifié parce que [raison]"
+   OR: "X est cohérent avec le reste de l'app → Fonction gagne"
+3. Check Simplicité: "[option Z] est plus simple mais ne délivre pas la valeur métier → Fonction prime"
+   OR: "[option X] et [option Y] délivrent la même valeur → Simplicité départage : X est plus simple pour l'utilisateur"
+4. Conclude: "Donc [option finale] via le chemin Fonction→Cohérence→Simplicité"
+```
+
+Concrete example (question 2, Architecture d'écran — comment l'utilisateur explore les sources) :
+
+```
+> **Impact fonctionnel** : ta réponse détermine si l'utilisateur filtre ou cherche ses sources, ce qui change directement l'écran de listing, le nombre d'interactions, et la découvrabilité.
+
+Comment l'utilisateur trouve-t-il une source dans la liste ?
+
+Option A — Filtre par catégorie (dropdown) au-dessus de la liste ⭐ Recommandé
+  ✅ Pour  : l'utilisateur réduit la liste en un clic → valeur fonctionnelle immédiate (Fonction).
+  ❌ Contre : un élément d'UI supplémentaire sur la page.
+
+Option B — Barre de recherche textuelle
+  ✅ Pour  : recherche par mot-clé, plus précis qu'un filtre catégoriel.
+  ❌ Contre : incohérent — aucune autre liste du dashboard n'a de recherche textuelle (Cohérence).
+
+Option C — Liste paginée, pas de filtre
+  ✅ Pour  : zéro ajout d'UI, tout est visible en scrollant → Simplicité.
+  ❌ Contre : avec 20+ sources, l'utilisateur scrolle indéfiniment → perte de valeur métier (Fonction).
+
+Pourquoi ⭐ : Fonction donnerait C si la liste est courte, mais dès 20+ sources l'utilisateur perd du temps → C ne délivre pas assez de valeur. A délivre la valeur immédiatement et reste cohérent avec le pattern de dropdown catégoriel utilisé ailleurs dans l'app. B casse cette cohérence pour une précision dont personne n'a besoin. Donc A via le chemin Fonction→Cohérence→Simplicité.
+```
+
+> The `question` tool option labels stay short (`Filtre par catégorie`, `Barre de recherche`, `Liste paginée`). Put the Pour/Contre and the `⭐ Recommandé` marker in the question **body** the tool renders above the options, so the user sees the trade-offs before choosing.
+
+---
+
+### User-Driven Capture (post-5-questions)
+
+Une fois le cycle des 5 questions terminé, demander explicitement à l'utilisateur s'il a identifié des points non couverts par les principes avant de passer à la synthèse.
 
 1. Poser cette question via l'outil `question` :
-   > *"Avant la synthèse : avez-vous d'autres points à intégrer dans cette user story qui n'auraient pas été identifiés par les personas ?"*
-   - Options : `Non, les personas ont tout couvert` / `Oui, j'ai des points à ajouter`
+   > *"Avant la synthèse : avez-vous d'autres points à intégrer dans cette user story qui n'auraient pas été identifiés par les 5 questions (périmètre, écrans, arbitrages, règles métier, états) ?"*
+   - Options : `Non, les questions ont tout couvert` / `Oui, j'ai des points à ajouter`
    - `custom: true` est disponible automatiquement pour détailler
 2. **Si l'utilisateur répond « Oui »** — pour chaque point apporté :
    - **Dans le périmètre de la story** → intégrer dans les ACs (réécrit en assertion testable) et/ou le `implementation_guide`
@@ -197,7 +274,7 @@ Une fois le cycle des rôles terminé, demander explicitement à l'utilisateur s
    - Consigner chaque décision dans `refine_decisions` lors de la persistance (Step 5)
 3. **Si l'utilisateur répond « Non »** → enchaîner directement sur la synthèse.
 
-> Cette étape capte l'intention et la connaissance métier de l'utilisateur qui dépassent le cadre des 4 personas. Elle ne remplace pas les questions des rôles — elle les complète.
+> Cette étape capte l'intention et la connaissance métier de l'utilisateur qui dépassent le cadre des 5 questions structurées. Elle ne les remplace pas — elle les complète.
 
 ---
 
